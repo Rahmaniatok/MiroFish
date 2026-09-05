@@ -79,6 +79,132 @@ def test_platform_completion_does_not_publish_terminal_success_before_barrier(
     assert state.runner_status == RunnerStatus.RUNNING
 
 
+def test_monitor_finalizes_natural_completion_while_producer_stays_alive(
+    monkeypatch, tmp_path
+):
+    """The parallel producer never exits on its own (it waits for interview
+    commands), so the monitor must publish COMPLETED once every platform has
+    emitted simulation_end, after draining Zep, without killing the process."""
+    simulation_id = "sim-natural-done"
+    for platform in ("twitter", "reddit"):
+        platform_dir = tmp_path / simulation_id / platform
+        platform_dir.mkdir(parents=True)
+        (platform_dir / "actions.jsonl").write_text(
+            '{"event_type":"simulation_end","total_rounds":1,"total_actions":0}\n',
+            encoding="utf-8",
+        )
+    monkeypatch.setattr(SimulationRunner, "RUN_STATE_DIR", str(tmp_path))
+
+    state = SimulationRunState(
+        simulation_id=simulation_id,
+        runner_status=RunnerStatus.RUNNING,
+        twitter_running=True,
+        reddit_running=True,
+    )
+
+    class Process:
+        pid = 4321
+        returncode = None
+
+        def poll(self):
+            return None  # stays alive in wait-for-commands mode
+
+    process = Process()
+    drained = []
+    terminated = []
+    synced = []
+
+    monkeypatch.setattr(
+        SimulationRunner,
+        "get_run_state",
+        classmethod(lambda _cls, _sid: state),
+    )
+    monkeypatch.setattr(
+        SimulationRunner,
+        "_save_run_state",
+        classmethod(lambda _cls, _state: None),
+    )
+    monkeypatch.setattr(
+        SimulationRunner,
+        "_sync_simulation_status",
+        classmethod(lambda _cls, _sid, status, *a, **k: synced.append(status)),
+    )
+    monkeypatch.setattr(
+        SimulationRunner,
+        "_terminate_process",
+        classmethod(lambda _cls, *a, **k: terminated.append(True)),
+    )
+    monkeypatch.setattr(
+        runner_module.ZepGraphMemoryManager,
+        "stop_updater",
+        classmethod(lambda _cls, sid: drained.append(sid)),
+    )
+
+    SimulationRunner._processes[simulation_id] = process
+    SimulationRunner._monitor_threads[simulation_id] = object()
+    SimulationRunner._graph_memory_enabled[simulation_id] = True
+    try:
+        SimulationRunner._monitor_simulation(simulation_id)
+
+        assert state.runner_status == RunnerStatus.COMPLETED
+        assert drained == [simulation_id]
+        assert RunnerStatus.STOPPING in synced and RunnerStatus.COMPLETED in synced
+        assert terminated == []
+        # env is still alive for interviews -> producer handle retained
+        assert SimulationRunner._processes.get(simulation_id) is process
+        assert simulation_id not in SimulationRunner._monitor_threads
+    finally:
+        SimulationRunner._processes.pop(simulation_id, None)
+        SimulationRunner._monitor_threads.pop(simulation_id, None)
+        SimulationRunner._graph_memory_enabled.pop(simulation_id, None)
+        SimulationRunner._manual_stop_requests.discard(simulation_id)
+        SimulationRunner._run_states.pop(simulation_id, None)
+
+
+def test_stop_after_natural_completion_tears_down_idle_producer(monkeypatch):
+    simulation_id = "sim-done-then-stop"
+    state = SimulationRunState(
+        simulation_id=simulation_id,
+        runner_status=RunnerStatus.COMPLETED,
+    )
+
+    class Process:
+        pid = 999
+
+        def poll(self):
+            return None
+
+    process = Process()
+    terminated = []
+
+    monkeypatch.setattr(
+        SimulationRunner,
+        "get_run_state",
+        classmethod(lambda _cls, _sid: state),
+    )
+    monkeypatch.setattr(
+        SimulationRunner,
+        "_terminate_process",
+        classmethod(lambda _cls, *a, **k: terminated.append(True)),
+    )
+    monkeypatch.setattr(
+        runner_module.ZepGraphMemoryManager,
+        "get_updater",
+        classmethod(lambda _cls, _sid: None),
+    )
+
+    SimulationRunner._processes[simulation_id] = process
+    SimulationRunner._monitor_threads.pop(simulation_id, None)
+    try:
+        result = SimulationRunner.stop_simulation(simulation_id)
+        assert result.runner_status == RunnerStatus.COMPLETED
+        assert terminated == [True]
+        assert simulation_id not in SimulationRunner._processes
+    finally:
+        SimulationRunner._processes.pop(simulation_id, None)
+        SimulationRunner._manual_stop_requests.discard(simulation_id)
+
+
 def test_manual_stop_timeout_leaves_monitor_owned_state_stopping(monkeypatch):
     state = SimulationRunState(
         simulation_id="sim-timeout",

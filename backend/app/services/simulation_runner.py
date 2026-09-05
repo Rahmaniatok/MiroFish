@@ -361,10 +361,16 @@ class SimulationRunner:
         state_file = os.path.join(sim_dir, "run_state.json")
         
         data = state.to_detail_dict()
-        
-        with open(state_file, 'w', encoding='utf-8') as f:
+
+        # Write atomically so a crash / signal mid-write can never leave a
+        # truncated run_state.json that would later load as "no state".
+        tmp_file = f"{state_file}.{os.getpid()}.tmp"
+        with open(tmp_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_file, state_file)
+
         cls._run_states[state.simulation_id] = state
     
     @classmethod
@@ -637,6 +643,11 @@ class SimulationRunner:
         
         monitor_error: Exception | None = None
         exit_code: int | None = None
+        # The parallel producer stays alive in "wait for commands" mode after
+        # every round finishes so the env can still serve interviews. It never
+        # exits on its own, so completion has to be detected from the
+        # simulation_end events rather than from process exit.
+        completed_naturally = False
         try:
             while process.poll() is None:  # 进程仍在运行
                 # 读取 Twitter 动作日志
@@ -644,17 +655,28 @@ class SimulationRunner:
                     twitter_position = cls._read_action_log(
                         twitter_actions_log, twitter_position, state, "twitter"
                     )
-                
+
                 # 读取 Reddit 动作日志
                 if os.path.exists(reddit_actions_log):
                     reddit_position = cls._read_action_log(
                         reddit_actions_log, reddit_position, state, "reddit"
                     )
-                
+
                 # 更新状态
                 cls._save_run_state(state)
+
+                # 所有启用的平台都跑完轮次后，进程仍会驻留等待命令，
+                # 此时主动收尾，否则前端会一直停留在“运行中”。
+                if cls._check_all_platforms_completed(state):
+                    completed_naturally = True
+                    logger.info(
+                        f"所有平台已结束，开始收尾（环境保持运行以支持采访）: "
+                        f"{simulation_id}"
+                    )
+                    break
+
                 time.sleep(2)
-            
+
             # 进程结束后，最后读取一次日志
             if os.path.exists(twitter_actions_log):
                 cls._read_action_log(twitter_actions_log, twitter_position, state, "twitter")
@@ -690,7 +712,14 @@ class SimulationRunner:
                     if not manual_stop and monitor_error is not None:
                         desired_status = RunnerStatus.FAILED
                         error_message = str(monitor_error)
-                    elif not manual_stop and exit_code != 0:
+                    elif (
+                        not manual_stop
+                        and not completed_naturally
+                        and exit_code != 0
+                    ):
+                        # exit_code is None when the producer is still alive
+                        # after a natural completion; that is expected and must
+                        # not be treated as a crash.
                         desired_status = RunnerStatus.FAILED
                         main_log_path = os.path.join(sim_dir, "simulation.log")
                         error_info = ""
@@ -743,25 +772,33 @@ class SimulationRunner:
                     else:
                         logger.error(f"模拟失败: {simulation_id}, error={state.error}")
                 cls._manual_stop_requests.discard(simulation_id)
-            
-            # 清理进程资源
-            cls._processes.pop(simulation_id, None)
-            cls._action_queues.pop(simulation_id, None)
+
+            # The monitor thread is ending regardless; drop its own handle.
             cls._monitor_threads.pop(simulation_id, None)
-            
-            # 关闭日志文件句柄
-            if simulation_id in cls._stdout_files:
-                try:
-                    cls._stdout_files[simulation_id].close()
-                except Exception:
-                    pass
-                cls._stdout_files.pop(simulation_id, None)
-            if simulation_id in cls._stderr_files and cls._stderr_files[simulation_id]:
-                try:
-                    cls._stderr_files[simulation_id].close()
-                except Exception:
-                    pass
-                cls._stderr_files.pop(simulation_id, None)
+
+            # On a natural completion the producer is still alive in
+            # wait-for-commands mode so the env can serve interviews. Keep its
+            # process handle and log files open; stop_simulation / close_env /
+            # shutdown will tear them down later. Otherwise release everything.
+            producer_alive = completed_naturally and process.poll() is None
+            if not producer_alive:
+                # 清理进程资源
+                cls._processes.pop(simulation_id, None)
+                cls._action_queues.pop(simulation_id, None)
+
+                # 关闭日志文件句柄
+                if simulation_id in cls._stdout_files:
+                    try:
+                        cls._stdout_files[simulation_id].close()
+                    except Exception:
+                        pass
+                    cls._stdout_files.pop(simulation_id, None)
+                if simulation_id in cls._stderr_files and cls._stderr_files[simulation_id]:
+                    try:
+                        cls._stderr_files[simulation_id].close()
+                    except Exception:
+                        pass
+                    cls._stderr_files.pop(simulation_id, None)
     
     @classmethod
     def _read_action_log(
@@ -969,6 +1006,35 @@ class SimulationRunner:
             if not state:
                 raise ValueError(f"模拟不存在: {simulation_id}")
             if state.runner_status == RunnerStatus.STOPPED:
+                return state
+
+            # A natural completion publishes COMPLETED but leaves the producer
+            # running so the env can serve interviews. A later stop/close just
+            # tears that idle producer down; the terminal status is unchanged.
+            if (
+                state.runner_status == RunnerStatus.COMPLETED
+                and ZepGraphMemoryManager.get_updater(simulation_id) is None
+            ):
+                process = cls._processes.get(simulation_id)
+                if process is not None and process.poll() is None:
+                    try:
+                        cls._terminate_process(process, simulation_id)
+                    except ProcessLookupError:
+                        pass
+                    except Exception as e:
+                        logger.error(
+                            f"终止已完成模拟的进程失败: {simulation_id}, error={e}"
+                        )
+                cls._processes.pop(simulation_id, None)
+                cls._action_queues.pop(simulation_id, None)
+                cls._monitor_threads.pop(simulation_id, None)
+                for file_map in (cls._stdout_files, cls._stderr_files):
+                    file_handle = file_map.pop(simulation_id, None)
+                    if file_handle:
+                        try:
+                            file_handle.close()
+                        except Exception:
+                            pass
                 return state
 
             pending_updater = ZepGraphMemoryManager.get_updater(simulation_id)
