@@ -58,3 +58,7 @@ backend/uploads/
 
 # Docker 数据
 data/
+
+# 市场数据本地缓存(SQLite)
+backend/app/data_layer/*.db
+backend/app/data_layer/*.db-journal
