@@ -38,6 +38,7 @@ fundamental historis bawaan. Akibatnya, saat `as_of_date` diisi:
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import yfinance as yf
 from dateutil.relativedelta import relativedelta
 from yfinance.exceptions import YFException
@@ -78,6 +79,16 @@ _UNRELIABLE_FUNDAMENTAL_FIELDS = {
 # _resolve_lookback_start) — lebih tua dari IPO saham manapun yang realistis
 _EARLIEST_POSSIBLE_DATE = date(1900, 1, 1)
 
+# Phase 1e: indikator lambat (SMA200, warm-up MACD) butuh histori panjang.
+# Fetch price SELALU diperlebar minimal sekian tahun ke belakang untuk warm-up,
+# lalu ohlcv + stats "52 minggu" dipotong balik ke `period` yang diminta
+# (lihat _trim_history_to_period). Perlebaran ini HANYA ke masa lalu — tidak
+# pernah melewati as_of_date (lihat komentar besar di fetch_price_data).
+_INDICATOR_LOOKBACK_YEARS = 2
+_MIN_INDICATOR_PERIOD = "2y"
+# urut dari terpendek ke terpanjang, dipakai _widen_period_for_indicators
+_PERIOD_LENGTH_ORDER = ("1d", "5d", "1mo", "3mo", "6mo", "ytd", "1y", "2y", "5y", "10y", "max")
+
 
 def _resolve_lookback_start(as_of: date, period: str) -> date:
     """
@@ -109,6 +120,36 @@ def _resolve_lookback_start(as_of: date, period: str) -> date:
     return as_of - delta
 
 
+def _widen_period_for_indicators(period: str) -> str:
+    """
+    Mode live: pastikan fetch cukup panjang untuk warm-up SMA200/MACD (minimal
+    _MIN_INDICATOR_PERIOD). period yang sudah >= 2y dibiarkan apa adanya; yang
+    lebih pendek atau tidak dikenal dinaikkan ke '2y'. ohlcv yang dikembalikan
+    tetap dipotong ke `period` asli lewat _trim_history_to_period().
+    """
+    try:
+        if _PERIOD_LENGTH_ORDER.index(period) >= _PERIOD_LENGTH_ORDER.index(_MIN_INDICATOR_PERIOD):
+            return period
+    except ValueError:
+        pass
+    return _MIN_INDICATOR_PERIOD
+
+
+def _trim_history_to_period(history, period: str, ref_end_date: date):
+    """
+    Potong `history` (yang sengaja di-fetch lebih panjang demi warm-up
+    indikator) kembali ke jendela `period` yang diminta, berakhir di
+    ref_end_date.
+
+    Ini HANYA memengaruhi ohlcv + stats "52 minggu" yang dikembalikan.
+    technical_indicators dihitung SEBELUM pemotongan ini, di atas seri penuh —
+    jadi memperlebar fetch demi warm-up TIDAK diam-diam mengubah "52w_high"
+    menjadi "high beberapa tahun".
+    """
+    window_start = _resolve_lookback_start(ref_end_date, period)
+    return history[history.index.date >= window_start]
+
+
 def fetch_price_data(ticker: str, period: str = "1y", as_of_date: Optional[str] = None) -> Dict[str, Any]:
     """
     获取股票历史价格数据(OHLCV)及基础衍生统计指标
@@ -116,7 +157,11 @@ def fetch_price_data(ticker: str, period: str = "1y", as_of_date: Optional[str] 
     Args:
         ticker: 股票代码，如 "AAPL"
         period: yfinance 支持的周期字符串，如 "1mo"/"3mo"/"1y"/"5y"/"max"/"ytd"。
-            无论 live 还是 as_of_date 模式，都是作为"向前回溯多久"的窗口长度。
+            无论 live 还是 as_of_date 模式，都是作为"向前回溯多久"的窗口长度，
+            决定返回的 ohlcv 和 stats("52周") 的范围。
+            注意(Phase 1e): technical_indicators 需要更长的历史(SMA200 等)，
+            所以内部实际抓取的区间会被自动放宽到至少约 2 年，再把 ohlcv/stats
+            裁剪回 period；technical_indicators 用的是未裁剪的完整序列。
         as_of_date: None（默认）= mode live，行为跟以前一样，抓取截至今天的数据。
             Diisi string ISO "YYYY-MM-DD" = mode historis: HANYA data s.d.
             (dan termasuk) tanggal tersebut yang diambil dari yfinance, dan
@@ -137,11 +182,20 @@ def fetch_price_data(ticker: str, period: str = "1y", as_of_date: Optional[str] 
                 "change_1mo_pct": float | None,
                 "change_3mo_pct": float | None,
                 "change_1y_pct": float | None,
+            },
+            "technical_indicators": {   # Phase 1e — semua field bisa None kalau data kurang
+                "price_vs_sma50": float | None,   # (close - SMA50) / SMA50 * 100
+                "price_vs_sma200": float | None,  # (close - SMA200) / SMA200 * 100
+                "rsi_14": float | None,           # 0..100 (Wilder)
+                "macd_signal": {"macd": float|None, "signal": float|None, "histogram": float|None},
+                "bollinger_position": float | None,  # %B: 0=band bawah, 1=band atas
+                "volume_vs_avg": float | None,       # volume terakhir / rata-rata 20 hari sebelumnya
+                "change_1d_pct": float | None,       # perubahan harga 1 hari (%)
             }
         }
         失败: {"ticker": str, "success": False, "error": str, "period": None,
                "as_of_date": str | None, "ohlcv": None, "latest_close": None,
-               "latest_date": None, "stats": None}
+               "latest_date": None, "stats": None, "technical_indicators": None}
     """
     ticker = (ticker or "").strip().upper()
     if not ticker:
@@ -158,9 +212,33 @@ def fetch_price_data(ticker: str, period: str = "1y", as_of_date: Optional[str] 
 
     try:
         if as_of is None:
-            history = yf.Ticker(ticker).history(period=period)
+            # Perlebar fetch supaya indikator lambat (SMA200, warm-up MACD)
+            # punya cukup histori; ohlcv dipotong balik ke `period` di bawah.
+            history = yf.Ticker(ticker).history(period=_widen_period_for_indicators(period))
         else:
-            start = _resolve_lookback_start(as_of, period)
+            # ================= LOOKBACK vs. LEAKAGE — WAJIB BACA =================
+            # Ada DUA hal berbeda yang sedang diseimbangkan di sini, gampang
+            # tertukar dan menghasilkan bug halus:
+            #
+            #   1. LOOKBACK (butuh LEBIH BANYAK data masa lalu): indikator seperti
+            #      SMA200 perlu ~200 hari dagang SEBELUM as_of_date. Karena itu
+            #      awal jendela fetch mundur sampai _INDICATOR_LOOKBACK_YEARS
+            #      tahun SEBELUM as_of_date, BUKAN mulai dari as_of_date. Kalau
+            #      fetch dimulai tepat di as_of_date, SMA200 diam-diam jadi
+            #      None / sampah.
+            #
+            #   2. LEAKAGE (TIDAK boleh ada data masa depan): tidak boleh ada
+            #      SATU baris pun bertanggal SETELAH as_of_date yang ikut masuk
+            #      ke perhitungan apa pun (ohlcv, stats, MAUPUN indikator).
+            #      `end` dipatok di as_of_date + 1 hari, DAN ada filter eksplisit
+            #      di bawah sebagai jaring pengaman.
+            #
+            # Ringkas: jendela HANYA dilebarkan ke MASA LALU; ujung kanannya
+            # tidak pernah melewati as_of_date.
+            # ===================================================================
+            lookback_start = _resolve_lookback_start(as_of, period)
+            indicator_start = as_of - relativedelta(years=_INDICATOR_LOOKBACK_YEARS)
+            start = min(lookback_start, indicator_start)
             # CATATAN(diverifikasi manual): parameter `end` di yfinance bersifat
             # EKSKLUSIF — history(end="2024-05-31") berhenti di baris 2024-05-30,
             # baru history(end="2024-06-01") menyertakan baris 2024-05-31. Karena
@@ -180,12 +258,12 @@ def fetch_price_data(ticker: str, period: str = "1y", as_of_date: Optional[str] 
         return _price_error(ticker, f"未找到股票代码 '{ticker}' 的历史数据，可能是无效代码或已退市", as_of_date)
 
     if as_of is not None:
-        # Jaring pengaman tambahan (defense in depth): walaupun `end` di atas
-        # sudah dihitung supaya tidak melewati as_of_date, di sini kita filter
-        # eksplisit sekali lagi berdasarkan tanggal tiap baris. Tujuannya agar
-        # jaminan "tidak ada kebocoran data masa depan" TIDAK diam-diam
-        # bergantung pada detail exclusivity/timezone `end` milik yfinance
-        # yang berpotensi berubah di versi mendatang.
+        # LEAKAGE GUARD (defense in depth): walaupun `end` di atas sudah dihitung
+        # supaya tidak melewati as_of_date, di sini kita filter eksplisit sekali
+        # lagi berdasarkan tanggal tiap baris. SEMUA perhitungan setelah baris
+        # ini — ohlcv, stats, DAN technical_indicators — hanya boleh melihat
+        # baris bertanggal <= as_of_date. Jangan menghitung indikator apa pun
+        # dari `history` sebelum filter ini dijalankan.
         history = history[history.index.date <= as_of]
         if history.empty:
             return _price_error(
@@ -194,8 +272,21 @@ def fetch_price_data(ticker: str, period: str = "1y", as_of_date: Optional[str] 
                 as_of_date,
             )
 
+    # --- Technical indicators (Phase 1e) ---
+    # Dihitung dari SELURUH `history` yang (sudah difilter leak-safe di atas) —
+    # justru butuh bagian yang lebih panjang dari `period` untuk warm-up.
+    indicator_closes = [float(v) for v in history["Close"].tolist() if v == v]
+    indicator_volumes = [float(v) for v in history["Volume"].tolist() if v == v]
+    technical_indicators = _compute_technical_indicators(indicator_closes, indicator_volumes)
+
+    # --- ohlcv + stats "52 minggu": HANYA jendela `period` yang diminta ---
+    # (technical_indicators sudah dihitung di atas dari seri penuh, jadi
+    # pemotongan ini tidak mempengaruhinya.)
+    ref_end_date = as_of if as_of is not None else history.index[-1].date()
+    window = _trim_history_to_period(history, period, ref_end_date)
+
     ohlcv: List[Dict[str, Any]] = []
-    for row_date, row in history.iterrows():
+    for row_date, row in window.iterrows():
         volume = row.get("Volume")
         ohlcv.append({
             "date": row_date.strftime("%Y-%m-%d"),
@@ -206,7 +297,7 @@ def fetch_price_data(ticker: str, period: str = "1y", as_of_date: Optional[str] 
             "volume": int(volume) if volume == volume else None,  # volume != volume <=> NaN
         })
 
-    closes = history["Close"]
+    closes = window["Close"]
     # 注意: 当可用数据只有约252个交易日时（例如 period="1y"），不足以覆盖
     # "252个交易日前"这一比较点，此时 change_1y_pct 会是 None。如需稳定获取
     # 1年涨跌幅，调用方可传入更长的 period（如 "2y"）。
@@ -226,8 +317,9 @@ def fetch_price_data(ticker: str, period: str = "1y", as_of_date: Optional[str] 
         "as_of_date": as_of_date,
         "ohlcv": ohlcv,
         "latest_close": _round_or_none(closes.iloc[-1]),
-        "latest_date": history.index[-1].strftime("%Y-%m-%d"),
+        "latest_date": window.index[-1].strftime("%Y-%m-%d"),
         "stats": stats,
+        "technical_indicators": technical_indicators,
     }
 
 
@@ -331,13 +423,23 @@ def get_price_data(ticker: str, as_of_date: Optional[str] = None) -> Dict[str, A
             字符串表示查询/缓存该日期对应的历史快照(缓存永不过期)。自
             Phase 1c 起，as_of_date 会真正透传给 fetch_price_data 用于
             过滤数据范围，不再只是缓存键。
+
+    自 Phase 1e 起，fetch_price_data 的返回值多了一个 "technical_indicators"
+    字段。本函数不需要任何改动即可透传它——缓存的是 fetch_price_data 的整个
+    dict(同一个 (ticker, as_of_date) 的 JSON blob)，technical_indicators 天然
+    包含在内，缓存表结构无需变更。
     """
     ticker = (ticker or "").strip().upper()
 
     cached = get_cached(ticker, "price", as_of_date)
-    if cached is not None:
+    if cached is not None and "technical_indicators" in cached:
         logger.info(f"Cache hit for {ticker}/price" + (f"@{as_of_date}" if as_of_date else " (live)"))
         return cached
+    if cached is not None:
+        # 命中了 Phase 1e 之前写入的旧缓存(没有 technical_indicators 字段)：
+        # 当作未命中，重新抓取并覆盖，避免下游拿到缺字段的结果。
+        logger.info(f"Cache hit but stale schema (no technical_indicators), refetching: {ticker}/price"
+                    + (f"@{as_of_date}" if as_of_date else " (live)"))
 
     logger.info(f"Cache miss, fetching from yfinance: {ticker}/price" + (f"@{as_of_date}" if as_of_date else " (live)"))
     result = fetch_price_data(ticker, as_of_date=as_of_date)
@@ -429,6 +531,7 @@ def _price_error(ticker: str, error: str, as_of_date: Optional[str] = None) -> D
         "latest_close": None,
         "latest_date": None,
         "stats": None,
+        "technical_indicators": None,
     }
 
 
@@ -466,6 +569,183 @@ def _pct_change_over_trading_days(closes, trading_days: int) -> Optional[float]:
     if past == 0 or past != past or latest != latest:
         return None
     return round((latest - past) / past * 100, 2)
+
+
+# ============================================================================
+# Technical indicators — Phase 1e
+# ----------------------------------------------------------------------------
+# Pilihan implementasi: environment ini HANYA punya numpy + pandas (lewat
+# yfinance); TIDAK ada `ta`, `pandas_ta`, maupun TA-Lib. Daripada menambah
+# dependency baru hanya untuk 5 indikator standar, semuanya dihitung manual di
+# sini dengan numpy + Python murni. Definisi mengikuti konvensi umum yang
+# dipakai TradingView / StockCharts:
+#   - EMA: rekursif dengan adjust=False (setara pandas .ewm(span=, adjust=False))
+#   - RSI: Wilder's smoothing (RMA), seed = SMA `period` nilai pertama
+#   - Bollinger: population std (ddof=0), %B = (harga-bawah)/(atas-bawah)
+#
+# KONTRAK PENTING: semua fungsi di bawah menerima list angka yang pemanggilnya
+# WAJIB sudah memfilter supaya tidak memuat data setelah as_of_date. Fungsi ini
+# sendiri tidak tahu-menahu soal tanggal (lihat fetch_price_data — indikator
+# dihitung SETELAH filter `history.index.date <= as_of`).
+# ============================================================================
+
+def _ema(values: np.ndarray, span: int) -> np.ndarray:
+    """EMA rekursif, setara pandas Series.ewm(span=span, adjust=False).mean()."""
+    alpha = 2.0 / (span + 1.0)
+    out = np.empty(len(values), dtype="float64")
+    out[0] = values[0]
+    for i in range(1, len(values)):
+        out[i] = alpha * values[i] + (1.0 - alpha) * out[i - 1]
+    return out
+
+
+def _wilder_rma(values: np.ndarray, period: int) -> np.ndarray:
+    """
+    Wilder's smoothing / RMA (dipakai RSI):
+      seed  = rata-rata sederhana `period` nilai pertama
+      rma[i] = (rma[i-1] * (period-1) + x[i]) / period
+    Elemen sebelum index `period-1` diisi NaN.
+    """
+    out = np.full(len(values), np.nan, dtype="float64")
+    if len(values) < period:
+        return out
+    seed = float(values[:period].mean())
+    out[period - 1] = seed
+    for i in range(period, len(values)):
+        seed = (seed * (period - 1) + values[i]) / period
+        out[i] = seed
+    return out
+
+
+def sma(prices: List[float], window: int) -> Optional[float]:
+    """
+    Simple Moving Average — rata-rata `window` harga terakhir (dipakai untuk
+    SMA50 dan SMA200). Return None kalau data < window (mis. SMA200 untuk saham
+    yang baru IPO).
+    """
+    vals = [p for p in prices if p is not None and p == p]
+    if window <= 0 or len(vals) < window:
+        return None
+    return round(sum(vals[-window:]) / window, 4)
+
+
+def rsi(prices: List[float], period: int = 14) -> Optional[float]:
+    """
+    Relative Strength Index (Wilder). Skala 0..100; >70 lazim disebut
+    overbought, <30 oversold. Return None kalau data < period + 1.
+    """
+    vals = [p for p in prices if p is not None and p == p]
+    if len(vals) < period + 1:
+        return None
+    arr = np.asarray(vals, dtype="float64")
+    delta = np.diff(arr)
+    gain = np.where(delta > 0.0, delta, 0.0)
+    loss = np.where(delta < 0.0, -delta, 0.0)
+    avg_gain = _wilder_rma(gain, period)[-1]
+    avg_loss = _wilder_rma(loss, period)[-1]
+    if np.isnan(avg_gain) or np.isnan(avg_loss):
+        return None
+    if avg_loss == 0.0:
+        return 100.0 if avg_gain > 0.0 else 50.0
+    rs = avg_gain / avg_loss
+    return round(100.0 - 100.0 / (1.0 + rs), 2)
+
+
+def macd_signal(prices: List[float]) -> Dict[str, Optional[float]]:
+    """
+    MACD standar 12/26/9:
+      macd      = EMA12(close) - EMA26(close)
+      signal    = EMA9(macd)
+      histogram = macd - signal
+    Return semua None kalau data < 35 (26 + 9, minimum supaya signal bermakna).
+    """
+    vals = [p for p in prices if p is not None and p == p]
+    if len(vals) < 26 + 9:
+        return {"macd": None, "signal": None, "histogram": None}
+    arr = np.asarray(vals, dtype="float64")
+    macd_line = _ema(arr, 12) - _ema(arr, 26)
+    signal_line = _ema(macd_line, 9)
+    histogram = macd_line - signal_line
+    return {
+        "macd": round(float(macd_line[-1]), 4),
+        "signal": round(float(signal_line[-1]), 4),
+        "histogram": round(float(histogram[-1]), 4),
+    }
+
+
+def bollinger_position(prices: List[float], window: int = 20, num_std: float = 2.0) -> Optional[float]:
+    """
+    Posisi harga terakhir di dalam Bollinger Bands, sebagai %B:
+      %B = (harga - band_bawah) / (band_atas - band_bawah)
+    0.0 = tepat di band bawah, 1.0 = tepat di band atas. Bisa < 0 atau > 1
+    kalau harga menembus band. Return None kalau data < window atau std = 0.
+    """
+    vals = [p for p in prices if p is not None and p == p]
+    if window <= 0 or len(vals) < window:
+        return None
+    win = np.asarray(vals[-window:], dtype="float64")
+    mid = float(win.mean())
+    sd = float(win.std(ddof=0))
+    if sd == 0.0:
+        return None
+    upper = mid + num_std * sd
+    lower = mid - num_std * sd
+    return round((vals[-1] - lower) / (upper - lower), 4)
+
+
+def volume_vs_avg(volumes: List[float], window: int = 20) -> Optional[float]:
+    """
+    Rasio volume hari terakhir terhadap rata-rata `window` hari SEBELUMNYA
+    (tidak termasuk hari terakhir itu sendiri). 1.0 = seperti biasa,
+    2.0 = dua kali lipat rata-rata. Return None kalau data < window + 1 atau
+    rata-ratanya 0.
+    """
+    vals = [v for v in volumes if v is not None and v == v]
+    if window <= 0 or len(vals) < window + 1:
+        return None
+    prior = vals[-window - 1:-1]
+    avg = sum(prior) / window
+    if avg == 0:
+        return None
+    return round(vals[-1] / avg, 4)
+
+
+def _pct_diff(value: Optional[float], reference: Optional[float]) -> Optional[float]:
+    """(value - reference) / reference * 100, dibulatkan 2 desimal."""
+    if value is None or reference is None or reference == 0:
+        return None
+    return round((value - reference) / reference * 100.0, 2)
+
+
+def _pct_change_last_n(prices: List[float], n: int) -> Optional[float]:
+    """Versi list dari _pct_change_over_trading_days (dipakai untuk change_1d_pct)."""
+    vals = [p for p in prices if p is not None and p == p]
+    if len(vals) <= n:
+        return None
+    latest, past = vals[-1], vals[-1 - n]
+    if past == 0:
+        return None
+    return round((latest - past) / past * 100.0, 2)
+
+
+def _compute_technical_indicators(closes: List[float], volumes: List[float]) -> Dict[str, Any]:
+    """
+    Rakit dict `technical_indicators` untuk fetch_price_data.
+
+    `closes` / `volumes` HARUS sudah difilter oleh pemanggil supaya tidak
+    memuat data setelah as_of_date (di fetch_price_data hal ini dijamin karena
+    fungsi ini dipanggil SETELAH filter `history.index.date <= as_of`).
+    """
+    latest = closes[-1] if closes else None
+    return {
+        "price_vs_sma50": _pct_diff(latest, sma(closes, 50)),
+        "price_vs_sma200": _pct_diff(latest, sma(closes, 200)),
+        "rsi_14": rsi(closes, 14),
+        "macd_signal": macd_signal(closes),
+        "bollinger_position": bollinger_position(closes, 20, 2.0),
+        "volume_vs_avg": volume_vs_avg(volumes, 20),
+        "change_1d_pct": _pct_change_last_n(closes, 1),
+    }
 
 
 if __name__ == "__main__":
@@ -549,4 +829,57 @@ if __name__ == "__main__":
     print(
         f"\nRingkasan: top-level as_of_date pada context historis = {historical_ctx['as_of_date']!r}, "
         f"pada context live = {live_ctx['as_of_date']!r}"
+    )
+
+    # --- Phase 1e: technical_indicators + validasi no-lookahead untuk indikator ---
+    print(f"\n{'=' * 60}\nPhase 1e: technical_indicators & no-lookahead indikator\n{'=' * 60}")
+
+    px = historical_ctx["price"]
+    ti = px["technical_indicators"]
+    print(f"\nAAPL technical_indicators @ as_of_date={AS_OF}:")
+    print(f"  latest_close ({px['latest_date']})  : {px['latest_close']}")
+    print(f"  price_vs_sma50   (%)          : {ti['price_vs_sma50']}")
+    print(f"  price_vs_sma200  (%)          : {ti['price_vs_sma200']}")
+    print(f"  rsi_14                        : {ti['rsi_14']}")
+    print(f"  macd_signal                  : {ti['macd_signal']}")
+    print(f"  bollinger_position (%B)       : {ti['bollinger_position']}")
+    print(f"  volume_vs_avg (x 20d avg)     : {ti['volume_vs_avg']}")
+    print(f"  change_1d_pct    (%)          : {ti['change_1d_pct']}")
+
+    # Nilai SMA absolut untuk dicek manual di chart (Yahoo/TradingView) pada AS_OF:
+    closes_asof = [r["close"] for r in px["ohlcv"]]
+    print(f"\n  SMA50 absolut @ {AS_OF} (dari ohlcv as_of, period=1y) : {sma(closes_asof, 50)}")
+
+    # BUKTI TIDAK ADA LOOKAHEAD:
+    # Ambil seri harga LIVE (period '5y', menembus sampai hari ini). Lalu bandingkan
+    #   (a) SMA dihitung HANYA dari baris <= AS_OF   -> harus == yang dipakai pipeline
+    #   (b) SMA dihitung dari SEMUA baris (s.d. kini) -> harus BERBEDA jauh
+    # Kalau (b) ikut cocok, berarti indikator diam-diam melihat data setelah AS_OF.
+    live_5y = fetch_price_data("AAPL", period="5y")  # live, tanpa as_of_date
+    rows_5y = live_5y["ohlcv"]
+    closes_upto = [r["close"] for r in rows_5y if r["date"] <= AS_OF]
+    closes_all = [r["close"] for r in rows_5y]
+    print(f"\n  (seri 5y: {len(closes_all)} baris total, {len(closes_upto)} baris <= {AS_OF})")
+
+    for label, win in (("SMA50", 50), ("SMA200", 200)):
+        pit = sma(closes_upto, win)
+        full = sma(closes_all, win)
+        pipeline_pct = ti["price_vs_sma50"] if win == 50 else ti["price_vs_sma200"]
+        pit_pct = _pct_diff(closes_upto[-1], pit)
+        full_pct = _pct_diff(closes_all[-1], full)
+        print(f"\n  {label}: absolut @ {AS_OF} (manual) = {pit} | absolut s.d. kini = {full}")
+        print(f"       price_vs_{label.lower()}: pipeline={pipeline_pct}  manual@{AS_OF}={pit_pct}  s.d.kini={full_pct}")
+        assert pipeline_pct is not None and pit_pct is not None
+        assert abs(pipeline_pct - pit_pct) < 0.05, (
+            f"MISMATCH {label}: pipeline as_of={pipeline_pct} != hitung manual s.d. {AS_OF}={pit_pct}"
+        )
+        assert full_pct is None or abs(pipeline_pct - full_pct) > 0.5, (
+            f"BOCOR {label}: pipeline as_of={pipeline_pct} justru == hitung pakai data terkini={full_pct} "
+            f"-> indikator melihat data setelah {AS_OF}!"
+        )
+
+    print(
+        f"\nLULUS: SMA50 & SMA200 pada as_of_date={AS_OF} cocok dengan hitung manual "
+        f"yang HANYA memakai data s.d. {AS_OF}, dan jelas berbeda dari hitung memakai "
+        f"data terkini -> tidak ada lookahead pada technical_indicators."
     )

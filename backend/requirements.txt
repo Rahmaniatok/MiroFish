@@ -40,3 +40,8 @@ pydantic>=2.0.0
 yfinance>=1.7.0
 # as_of_date 历史区间计算（月/年级别的日期运算）
 python-dateutil>=2.9.0
+# 技术指标(SMA/RSI/MACD/Bollinger)在 market_data.py 里用 numpy 手动实现，
+# 不引入 ta/pandas_ta/TA-Lib。numpy/pandas 本是 yfinance 的传递依赖，这里
+# 显式声明：market_data.py 直接 import numpy，并依赖 yfinance 返回的 pandas 结构。
+numpy>=1.26.0
+pandas>=2.0.0
