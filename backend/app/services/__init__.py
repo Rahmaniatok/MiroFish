@@ -6,6 +6,12 @@ from .ontology_generator import OntologyGenerator
 from .graph_builder import GraphBuilderService
 from .text_processor import TextProcessor
 from .zep_entity_reader import ZepEntityReader, EntityNode, FilteredEntities
+from .financial_entity_extractor import (
+    extract_financial_entities,
+    extract_financial_entity_nodes,
+    build_filtered_entities,
+    FINANCIAL_ENTITY_TYPES,
+)
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .simulation_manager import SimulationManager, SimulationState, SimulationStatus
 from .simulation_config_generator import (
@@ -44,6 +50,10 @@ __all__ = [
     'ZepEntityReader',
     'EntityNode',
     'FilteredEntities',
+    'extract_financial_entities',
+    'extract_financial_entity_nodes',
+    'build_filtered_entities',
+    'FINANCIAL_ENTITY_TYPES',
     'OasisProfileGenerator',
     'OasisAgentProfile',
     'SimulationManager',

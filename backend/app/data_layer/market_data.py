@@ -62,17 +62,46 @@ _PERIOD_TO_RELATIVEDELTA = {
     "10y": relativedelta(years=10),
 }
 
-# yfinance `.info` 中已知覆盖率低或口径不稳定的基本面字段：跳过不返回，
-# 避免调用方把 None 误解读为"没有增长/没有股息"等业务含义。
+# yfinance `.info` fields that are known to be poorly covered or inconsistently
+# scaled: we do NOT return them, so callers never misread a None as a business
+# fact ("no growth" / "no dividend"). Each entry is surfaced in the returned
+# `skipped_fields` dict as {field name -> reason it is skipped}.
+#
+# Phase 1f (2026-09-08): ROE / Debt-to-Equity / EPS Growth / Dividend Yield from
+# the reference criteria are now populated (see the roe / debt_to_equity /
+# eps_growth / dividend_yield keys returned by fetch_fundamental_data). Only PEG
+# is still skipped:
+#   - PEG methodology is inconsistent across data providers and industries, and
+#     produces meaningless negative/outlier values when earnings are negative or
+#     shrinking; yfinance's trailingPegRatio is still ~12% None on a broad
+#     sample. Since pe_ratio and eps_growth are both returned now, callers can
+#     compute PEG themselves with one consistent formula instead of importing
+#     yfinance's opaque field.
+#   - dividend_yield uses trailingAnnualDividendYield (always a plain fraction,
+#     0.0 for non-payers) instead of the version-unstable dividendYield.
 _UNRELIABLE_FUNDAMENTAL_FIELDS = {
-    "trailingPegRatio": "经常为 None 或异常值，且不同行业 PEG 计算口径不一致",
-    "pegRatio": "同上，且该字段已在部分 yfinance 版本中弃用",
-    "earningsGrowth": "非美股/小盘股大量为 None，覆盖率低",
-    "dividendYield": "不同 yfinance 版本返回的单位不一致（如 0.5 vs 0.005），且无股息股票为 None",
-    "enterpriseToRevenue": "覆盖率低，部分行业（如金融）该指标无意义",
-    "enterpriseToEbitda": "同上",
-    "targetMeanPrice": "分析师目标价滞后且样本量不透明，不适合作为量化输入",
+    "trailingPegRatio": "PEG methodology is inconsistent across industries/providers and returns "
+                        "meaningless negative values when earnings are negative or declining; "
+                        "since Phase 1f, PEG is not returned - callers can derive it from "
+                        "pe_ratio / eps_growth with a consistent formula",
+    "pegRatio": "same as trailingPegRatio, and this field is deprecated in some yfinance versions",
+    "dividendYield": "this field's unit is inconsistent across yfinance versions (e.g. 2.41 meaning "
+                     "2.41% vs 0.0241); since Phase 1f, dividend_yield uses trailingAnnualDividendYield "
+                     "instead (always a plain fraction)",
+    "enterpriseToRevenue": "low coverage, and meaningless for some industries (e.g. financials)",
+    "enterpriseToEbitda": "same as enterpriseToRevenue",
+    "targetMeanPrice": "analyst target prices lag and their sample size is opaque; not suitable as a "
+                       "quantitative input",
 }
+
+# Bumped whenever the *meaning* of a cached fundamental field changes (not just
+# when a field is added). get_fundamental_data treats any cached row whose
+# schema_version != this as a miss and refetches, so stale rows can't leak a
+# differently-scaled value downstream.
+#   1  -> Phase 1a shape (pe_ratio, pb_ratio, market_cap, sector, ...)
+#   2  -> Phase 1f: added company_name / roe / debt_to_equity / eps_growth /
+#         dividend_yield; debt_to_equity normalized from percent to a plain ratio
+_FUNDAMENTAL_SCHEMA_VERSION = 2
 
 
 # Dipakai sebagai pengganti "tanpa batas bawah" untuk period="max" (lihat
@@ -349,16 +378,32 @@ def fetch_fundamental_data(ticker: str, as_of_date: Optional[str] = None) -> Dic
             is_point_in_time=False beserta warning-nya.
 
     Returns:
-        成功: {
+        success: {
             "ticker": str, "success": True, "error": None,
-            "as_of_date": str | None, "is_point_in_time": bool, "warning": str | None,
+            "as_of_date": str | None,
+            "schema_version": int,        # _FUNDAMENTAL_SCHEMA_VERSION; used for cache busting
+            "is_point_in_time": bool, "warning": str | None,
+            "company_name": str | None,   # yfinance longName (falls back to shortName)
             "pe_ratio": float | None, "pb_ratio": float | None,
             "market_cap": int | None, "sector": str | None, "industry": str | None,
             "revenue_growth_yoy": float | None, "profit_margin": float | None,
-            "skipped_fields": {字段名: 跳过原因},
+            # Phase 1f reference criteria:
+            "roe": float | None,             # returnOnEquity, plain fraction (0.15 = 15%)
+            "debt_to_equity": float | None,  # plain ratio (0.78 = 0.78x); yfinance's
+                                             #   debtToEquity is a percent number and is
+                                             #   divided by 100 here (see _percent_to_ratio)
+            "eps_growth": float | None,      # earningsGrowth, YoY, plain fraction
+            "dividend_yield": float | None,  # trailingAnnualDividendYield, plain fraction;
+                                             #   0.0 (not None) for non-payers
+            "skipped_fields": {field_name: reason_it_is_skipped},
         }
-        失败: {"ticker": str, "success": False, "error": str, ...其余字段为 None,
-               "skipped_fields": {...}}
+        failure: {"ticker": str, "success": False, "error": str, ...all other fields None,
+                  "skipped_fields": {...}}
+
+    In as_of_date mode every fundamental field above (including the 5 added in
+    Phase 1f) still carries is_point_in_time=False and the warning - like
+    pe_ratio and the other older fields, they are the CURRENT `.info` snapshot,
+    not the value as of as_of_date.
     """
     ticker = (ticker or "").strip().upper()
     if not ticker:
@@ -397,8 +442,12 @@ def fetch_fundamental_data(ticker: str, as_of_date: Optional[str] = None) -> Dic
         "success": True,
         "error": None,
         "as_of_date": as_of_date,
+        "schema_version": _FUNDAMENTAL_SCHEMA_VERSION,
         "is_point_in_time": is_point_in_time,
         "warning": warning,
+        # longName 覆盖率极高（宽口径样本 0/40 缺失），只有无效代码才为 None；
+        # 直接取自 .info，不依赖 Phase 1d 的 S&P 500 名单，任意 ticker 都能用。
+        "company_name": info.get("longName") or info.get("shortName"),
         "pe_ratio": pe_ratio,
         "pb_ratio": info.get("priceToBook"),
         "market_cap": info.get("marketCap"),
@@ -406,6 +455,19 @@ def fetch_fundamental_data(ticker: str, as_of_date: Optional[str] = None) -> Dic
         "industry": info.get("industry"),
         "revenue_growth_yoy": info.get("revenueGrowth"),
         "profit_margin": info.get("profitMargins"),
+        # --- Phase 1f: same access pattern as the older fields above (plain
+        #     info.get), and subject to the same is_point_in_time / warning ---
+        "roe": info.get("returnOnEquity"),
+        # yfinance reports debtToEquity as a PERCENTAGE number, not a ratio
+        # (verified against balance sheets: MSFT debtToEquity 29.118 == totalDebt
+        # / equity 0.2912; AAPL 78.445 -> 0.78). Normalize to a plain ratio here
+        # so downstream code reads 0.78x, not 78x — matching how dividend_yield
+        # is stored as a fraction (0.0033, not 0.33).
+        "debt_to_equity": _percent_to_ratio(info.get("debtToEquity")),
+        "eps_growth": info.get("earningsGrowth"),
+        # dividendYield's unit is unstable (see _UNRELIABLE_FUNDAMENTAL_FIELDS);
+        # trailingAnnualDividendYield is always a plain fraction, 0.0 for non-payers.
+        "dividend_yield": info.get("trailingAnnualDividendYield"),
         "skipped_fields": dict(_UNRELIABLE_FUNDAMENTAL_FIELDS),
     }
 
@@ -468,9 +530,20 @@ def get_fundamental_data(ticker: str, as_of_date: Optional[str] = None) -> Dict[
     ticker = (ticker or "").strip().upper()
 
     cached = get_cached(ticker, "fundamental", as_of_date)
-    if cached is not None:
+    if cached is not None and cached.get("schema_version") == _FUNDAMENTAL_SCHEMA_VERSION:
         logger.info(f"Cache hit for {ticker}/fundamental" + (f"@{as_of_date}" if as_of_date else " (live)"))
         return cached
+    if cached is not None:
+        # Cached row predates the current fundamental schema (missing fields, or
+        # a field whose meaning/scale has since changed - e.g. pre-1f rows, or
+        # 1f rows written before debt_to_equity was normalized). Treat it as a
+        # miss and refetch/overwrite so downstream never sees a stale-shaped row.
+        # (Same approach get_price_data uses for pre-1e cached rows.)
+        logger.info(
+            f"Cache hit but stale schema "
+            f"(cached v{cached.get('schema_version')!r} != v{_FUNDAMENTAL_SCHEMA_VERSION}), "
+            f"refetching: {ticker}/fundamental" + (f"@{as_of_date}" if as_of_date else " (live)")
+        )
 
     logger.info(f"Cache miss, fetching from yfinance: {ticker}/fundamental" + (f"@{as_of_date}" if as_of_date else " (live)"))
     result = fetch_fundamental_data(ticker, as_of_date=as_of_date)
@@ -501,6 +574,10 @@ def get_stock_context(ticker: str, as_of_date: Optional[str] = None) -> Dict[str
     Returns:
         {
             "ticker": str,
+            "company_name": str | None,  # Phase 1f: dari fundamental["company_name"]
+                                         #   (yfinance longName / shortName). Standalone
+                                         #   untuk ticker apa pun — TIDAK bergantung pada
+                                         #   daftar S&P 500 Phase 1d.
             "as_of_date": str,  # nilai as_of_date apa adanya, atau "live" jika None
             "success": bool,    # True hanya jika price DAN fundamental sama-sama sukses
             "price": <hasil get_price_data(...)>,
@@ -513,6 +590,7 @@ def get_stock_context(ticker: str, as_of_date: Optional[str] = None) -> Dict[str
 
     return {
         "ticker": ticker,
+        "company_name": fundamental.get("company_name"),
         "as_of_date": as_of_date if as_of_date is not None else "live",
         "success": bool(price.get("success")) and bool(fundamental.get("success")),
         "price": price,
@@ -540,9 +618,11 @@ def _fundamental_error(ticker: str, error: str, as_of_date: Optional[str] = None
         "ticker": ticker,
         "success": False,
         "as_of_date": as_of_date,
+        "schema_version": _FUNDAMENTAL_SCHEMA_VERSION,
         "is_point_in_time": None,
         "warning": None,
         "error": error,
+        "company_name": None,
         "pe_ratio": None,
         "pb_ratio": None,
         "market_cap": None,
@@ -550,6 +630,10 @@ def _fundamental_error(ticker: str, error: str, as_of_date: Optional[str] = None
         "industry": None,
         "revenue_growth_yoy": None,
         "profit_margin": None,
+        "roe": None,
+        "debt_to_equity": None,
+        "eps_growth": None,
+        "dividend_yield": None,
         "skipped_fields": dict(_UNRELIABLE_FUNDAMENTAL_FIELDS),
     }
 
@@ -558,6 +642,15 @@ def _round_or_none(value: Any, ndigits: int = 4) -> Optional[float]:
     if value is None or value != value:  # value != value <=> NaN
         return None
     return round(float(value), ndigits)
+
+
+def _percent_to_ratio(value: Any, ndigits: int = 6) -> Optional[float]:
+    """Convert a yfinance field that is expressed as a percentage number
+    (e.g. debtToEquity 78.445) into a plain ratio (0.78445). None/NaN pass
+    through as None."""
+    if value is None or value != value:  # value != value <=> NaN
+        return None
+    return round(float(value) / 100.0, ndigits)
 
 
 def _pct_change_over_trading_days(closes, trading_days: int) -> Optional[float]:
@@ -883,3 +976,50 @@ if __name__ == "__main__":
         f"yang HANYA memakai data s.d. {AS_OF}, dan jelas berbeda dari hitung memakai "
         f"data terkini -> tidak ada lookahead pada technical_indicators."
     )
+
+    # --- Phase 1f: all fundamental fields (old + new) + company_name ---
+    print(f"\n{'=' * 60}\nPhase 1f: full fundamental + company_name\n{'=' * 60}")
+
+    ctx_1f = get_stock_context("AAPL", as_of_date=AS_OF)
+    fund = ctx_1f["fundamental"]
+
+    print(f"\nget_stock_context('AAPL', as_of_date='{AS_OF}')")
+    print(f"  top-level company_name        : {ctx_1f['company_name']!r}")
+    print(f"\n  fundamental.company_name      : {fund['company_name']!r}")
+    print(f"  fundamental.schema_version    : {fund['schema_version']}")
+    print(f"  fundamental.is_point_in_time  : {fund['is_point_in_time']}")
+    print(f"  fundamental.warning           : {fund['warning']}")
+
+    print("\n  -- OLD fields (Phase 1a) --")
+    for key in ("pe_ratio", "pb_ratio", "market_cap", "sector", "industry",
+                "revenue_growth_yoy", "profit_margin"):
+        print(f"    {key:22}: {fund.get(key)!r}")
+
+    print("\n  -- NEW fields (Phase 1f) --")
+    for key in ("roe", "debt_to_equity", "eps_growth", "dividend_yield"):
+        print(f"    {key:22}: {fund.get(key)!r}")
+
+    # debt_to_equity: show yfinance's raw percent-scale number next to the
+    # normalized ratio we actually store.
+    raw_dte = yf.Ticker("AAPL").info.get("debtToEquity")
+    print(f"\n    debt_to_equity: yfinance raw = {raw_dte} (percent scale) "
+          f"-> stored = {fund['debt_to_equity']} (plain ratio, x{fund['debt_to_equity']:.2f})")
+
+    print("\n  -- SKIPPED fields (skipped_fields) --")
+    for name, reason in fund.get("skipped_fields", {}).items():
+        print(f"    {name:22}: {reason}")
+
+    assert ctx_1f["company_name"], "company_name empty -> longName not picked up"
+    assert all(k in fund for k in ("roe", "debt_to_equity", "eps_growth", "dividend_yield")), \
+        "Phase 1f fields missing from result"
+    assert "peg_ratio" not in fund, "PEG should be skipped, not returned"
+    assert fund["is_point_in_time"] is False, "as_of fundamental fields must be is_point_in_time=False"
+    # debt_to_equity must be a plain ratio now, not a percent number: a >20x D/E
+    # would be extraordinary, so anything that large means the /100 didn't happen.
+    assert fund["debt_to_equity"] is None or fund["debt_to_equity"] < 20, (
+        f"debt_to_equity={fund['debt_to_equity']} looks like a percent number, not a ratio"
+    )
+    assert raw_dte is None or abs(fund["debt_to_equity"] - raw_dte / 100.0) < 1e-6, \
+        "stored debt_to_equity is not yfinance debtToEquity / 100"
+    print(f"\nPASS: company_name + 4 new fundamental fields present, PEG skipped, "
+          f"debt_to_equity normalized to a ratio, all carry is_point_in_time=False.")
