@@ -16,6 +16,11 @@ from .entity_edge_builder import build_entity_edges, count_edges
 from .seed_builder import build_seed_from_ticker, SeedBuildError
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .consensus_screener import compute_consensus, screen_and_rank
+from .portfolio_optimizer import (
+    build_returns_matrix,
+    optimize_portfolio,
+    build_portfolio,
+)
 from .debate_room import (
     DebateRoom,
     DebateTranscript,
@@ -73,6 +78,9 @@ __all__ = [
     'OasisAgentProfile',
     'compute_consensus',
     'screen_and_rank',
+    'build_returns_matrix',
+    'optimize_portfolio',
+    'build_portfolio',
     'DebateRoom',
     'DebateTranscript',
     'DebateStatement',

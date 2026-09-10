@@ -37,6 +37,14 @@ dependencies = [
     # 数据层
     "yfinance>=1.7.0",
     "python-dateutil>=2.9.0.post0",
+
+    # 投资组合优化 (Phase 5e) — skfolio + its convex-solver backend.
+    # skfolio is pinned to the version validated against this repo; cvxpy-base
+    # and clarabel are the actual QP solver stack skfolio's MeanRisk runs on
+    # and are declared explicitly rather than left as implicit transitives.
+    "skfolio==1.0.6",
+    "cvxpy-base>=1.9.2",
+    "clarabel>=0.11.1",
 ]
 
 [project.optional-dependencies]
