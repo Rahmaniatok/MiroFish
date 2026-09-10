@@ -15,6 +15,7 @@ from .financial_entity_extractor import (
 from .entity_edge_builder import build_entity_edges, count_edges
 from .seed_builder import build_seed_from_ticker, SeedBuildError
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
+from .consensus_screener import compute_consensus, screen_and_rank
 from .debate_room import (
     DebateRoom,
     DebateTranscript,
@@ -70,6 +71,8 @@ __all__ = [
     'SeedBuildError',
     'OasisProfileGenerator',
     'OasisAgentProfile',
+    'compute_consensus',
+    'screen_and_rank',
     'DebateRoom',
     'DebateTranscript',
     'DebateStatement',
