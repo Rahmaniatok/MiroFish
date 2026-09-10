@@ -76,6 +76,318 @@ def _coerce_to_str_list(value: Any) -> List[str]:
     return [text] if text else []
 
 
+# ===========================================================================
+# Phase 3a — INVESTOR persona generation from a financial seed graph
+# ===========================================================================
+# The generator was originally a 1:1 map "one social entity -> one netizen
+# persona". For the investment engine we instead generate a FIXED set of
+# INVESTOR archetypes from the WHOLE seed graph (`build_seed_from_ticker`).
+# Each archetype has a permanent investing lens; its bullish/neutral/bearish
+# stance for a given ticker is DERIVED deterministically from the real entity
+# values (`_derive_investor_stance`), never invented by the LLM. The LLM (when
+# enabled) only writes the prose around that pre-computed stance and evidence;
+# a template fallback produces the same data-grounded persona without any LLM.
+# ---------------------------------------------------------------------------
+
+INVESTOR_ARCHETYPES: List[Dict[str, Any]] = [
+    {
+        "key": "value",
+        "name": "Value Investor",
+        "mbti": "ISTJ",
+        "topics": ["valuation", "margin of safety", "P/E", "P/B"],
+        "lens": (
+            "Judges a stock on the price paid relative to its earnings and book "
+            "value. Treats high P/E and P/B multiples as risk, not opportunity, "
+            "and wants a margin of safety before buying."
+        ),
+    },
+    {
+        "key": "growth",
+        "name": "Growth Investor",
+        "mbti": "ENTP",
+        "topics": ["revenue growth", "EPS growth", "compounding"],
+        "lens": (
+            "Judges a stock on the trajectory of revenue and earnings. Will "
+            "tolerate a rich valuation when revenue and EPS growth are strong, "
+            "and loses interest when that growth fades."
+        ),
+    },
+    {
+        "key": "technical",
+        "name": "Technical Trader",
+        "mbti": "ESTP",
+        "topics": ["price action", "RSI", "MACD", "moving averages"],
+        "lens": (
+            "Trades price and momentum, not the business. Reads RSI, MACD, "
+            "moving-average position and Bollinger bands, and largely ignores "
+            "valuation and fundamentals."
+        ),
+    },
+    {
+        "key": "quality",
+        "name": "Quality/Profitability Investor",
+        "mbti": "INTJ",
+        "topics": ["ROE", "profit margin", "balance sheet", "leverage"],
+        "lens": (
+            "Wants durable, highly profitable businesses: high ROE and profit "
+            "margin on a conservative balance sheet. Risk-averse toward "
+            "leverage - a high debt/equity ratio is a red flag even when "
+            "profitability looks strong."
+        ),
+    },
+    {
+        "key": "macro",
+        "name": "Macro/Sector Investor",
+        "mbti": "ENTJ",
+        "topics": ["sector rotation", "macro backdrop", "industry positioning"],
+        "lens": (
+            "Starts top-down from the sector and the company's position within "
+            "it. Cares less about any single company metric than about whether "
+            "this sector is where capital should be allocated now."
+        ),
+    },
+]
+
+
+def _num(value: Any) -> Optional[float]:
+    """Best-effort float; None on missing / NaN / non-numeric."""
+    try:
+        if value is None:
+            return None
+        f = float(value)
+        return f if f == f else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _index_seed_entities(entities: List[EntityNode]) -> Dict[str, Any]:
+    """Fold a flat `List[EntityNode]` seed graph into a lookup keyed by metric.
+
+    Reads only the flat entity list + each node's `attributes` / `summary`
+    (the fields Phase 2a fills). `related_edges` / `related_nodes` are already
+    summarised into `summaries` via each node's own summary text.
+    """
+    idx: Dict[str, Any] = {
+        "ticker": None, "company_name": None, "sector": None, "industry": None,
+        "as_of_date": None,
+        "valuation": {}, "fundamental": {}, "technical": {},
+        "summaries": [],
+    }
+    for entity in entities:
+        etype = entity.get_entity_type() or ""
+        attrs = entity.attributes or {}
+        if attrs.get("ticker") and not idx["ticker"]:
+            idx["ticker"] = attrs["ticker"]
+        if attrs.get("as_of_date") and not idx["as_of_date"]:
+            idx["as_of_date"] = attrs["as_of_date"]
+        if entity.summary:
+            idx["summaries"].append(entity.summary)
+
+        if etype == "Company":
+            idx["company_name"] = entity.name
+            idx["sector"] = idx["sector"] or attrs.get("sector")
+            idx["industry"] = idx["industry"] or attrs.get("industry")
+        elif etype == "Sector":
+            idx["sector"] = attrs.get("gics_sector") or entity.name
+            idx["industry"] = idx["industry"] or attrs.get("industry")
+        elif etype in ("ValuationMetric", "FundamentalMetric"):
+            bucket = "valuation" if etype == "ValuationMetric" else "fundamental"
+            key = attrs.get("metric") or entity.name
+            idx[bucket][key] = {
+                "display": attrs.get("display_name") or entity.name,
+                "value": _num(attrs.get("value")),
+                "unit": attrs.get("unit"),
+                "summary": entity.summary,
+            }
+        elif etype == "TechnicalSignal":
+            key = attrs.get("indicator") or entity.name
+            idx["technical"][key] = {
+                "display": attrs.get("display_name") or entity.name,
+                "value": _num(attrs.get("value")),
+                "signal": attrs.get("signal"),
+                "summary": entity.summary,
+            }
+    return idx
+
+
+def _seed_digest(idx: Dict[str, Any]) -> str:
+    """Human-readable dump of every real figure in the seed - fed to the LLM."""
+    lines: List[str] = []
+    lines.append(f"Company: {idx.get('company_name') or idx.get('ticker')} ({idx.get('ticker')})")
+    if idx.get("sector"):
+        lines.append(f"Sector / industry: {idx['sector']} / {idx.get('industry') or 'n/a'}")
+    for bucket, title in (
+        ("valuation", "Valuation metrics"),
+        ("fundamental", "Fundamental metrics"),
+        ("technical", "Technical signals"),
+    ):
+        if idx.get(bucket):
+            lines.append(f"{title}:")
+            for item in idx[bucket].values():
+                lines.append(f"  - {item['summary']}")
+    return "\n".join(lines)
+
+
+def _pct(fraction: Optional[float], digits: int = 1) -> str:
+    return "n/a" if fraction is None else f"{fraction * 100:.{digits}f}%"
+
+
+def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str, Any]:
+    """Deterministic bullish / neutral / bearish call for one archetype.
+
+    Returns {"stance", "rationale", "evidence": [str, ...]} where every
+    `evidence` string embeds a real figure from the seed graph. Same input
+    graph => same stance on every run (no randomness, no LLM).
+    """
+    val = idx.get("valuation", {})
+    fund = idx.get("fundamental", {})
+    tech = idx.get("technical", {})
+    ticker = idx.get("ticker") or "the stock"
+
+    def verdict(score: int, up: int, down: int) -> str:
+        return "bullish" if score >= up else "bearish" if score <= down else "neutral"
+
+    if archetype_key == "value":
+        pe = val.get("pe_ratio", {}).get("value")
+        pb = val.get("pb_ratio", {}).get("value")
+        evidence, score = [], 0
+        if pe is not None:
+            evidence.append(f"P/E of {pe:.1f}")
+            score += -2 if pe >= 30 else -1 if pe >= 22 else 1 if pe <= 15 else 0
+        if pb is not None:
+            evidence.append(f"P/B of {pb:.1f}")
+            score += -2 if pb >= 10 else -1 if pb >= 5 else 1 if pb <= 2 else 0
+        if not evidence:
+            return {"stance": "neutral", "evidence": [],
+                    "rationale": f"The seed graph carries no valuation multiples for {ticker}."}
+        stance = verdict(score, 2, -2)
+        rationale = {
+            "bearish": f"A {' and a '.join(evidence)} leave no margin of safety.",
+            "bullish": f"A {' and a '.join(evidence)} are undemanding for a business of this quality.",
+            "neutral": f"A {' and a '.join(evidence)} are neither cheap nor extreme.",
+        }[stance]
+        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+
+    if archetype_key == "growth":
+        rg = fund.get("revenue_growth_yoy", {}).get("value")
+        eg = fund.get("eps_growth", {}).get("value")
+        pe = val.get("pe_ratio", {}).get("value")
+        evidence, score = [], 0
+        if rg is not None:
+            evidence.append(f"revenue growth of {_pct(rg)} YoY")
+            score += 2 if rg >= 0.15 else 1 if rg >= 0.08 else -1 if rg < 0 else 0
+        if eg is not None:
+            evidence.append(f"EPS growth of {_pct(eg)} YoY")
+            score += 2 if eg >= 0.15 else 1 if eg >= 0.08 else -1 if eg < 0 else 0
+        if not evidence:
+            return {"stance": "neutral", "evidence": [],
+                    "rationale": f"The seed graph carries no growth metrics for {ticker}."}
+        stance = verdict(score, 3, -1)
+        if stance == "bullish":
+            rationale = f"{' and '.join(evidence).capitalize()} justify paying up"
+            rationale += f", even at a P/E of {pe:.1f}." if pe is not None else "."
+        elif stance == "bearish":
+            rationale = f"{' and '.join(evidence).capitalize()} is not the trajectory this style needs."
+        else:
+            rationale = f"{' and '.join(evidence).capitalize()} is solid but not exceptional."
+        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+
+    if archetype_key == "technical":
+        evidence, score = [], 0
+        s50 = tech.get("price_vs_sma50", {})
+        s200 = tech.get("price_vs_sma200", {})
+        macd = tech.get("macd", {})
+        rsi = tech.get("rsi_14", {})
+        boll = tech.get("bollinger_position", {})
+        if s50.get("value") is not None:
+            evidence.append(f"price {s50['value']:+.1f}% vs its 50-day average")
+            score += 1 if s50["value"] > 0 else -1
+        if s200.get("value") is not None:
+            evidence.append(f"price {s200['value']:+.1f}% vs its 200-day average")
+            score += 1 if s200["value"] > 0 else -1
+        if macd.get("value") is not None:
+            evidence.append(f"MACD histogram at {macd['value']:+.2f} ({macd.get('signal')})")
+            score += 1 if macd.get("signal") == "bullish" else -1 if macd.get("signal") == "bearish" else 0
+        if rsi.get("value") is not None:
+            evidence.append(f"RSI(14) at {rsi['value']:.0f}")
+            score += -1 if rsi["value"] >= 70 else 1 if rsi["value"] <= 30 else 0
+        if boll.get("value") is not None:
+            evidence.append(f"Bollinger %B at {boll['value']:.2f}")
+            score += -1 if boll["value"] >= 0.8 else 1 if boll["value"] <= 0.2 else 0
+        if not evidence:
+            return {"stance": "neutral", "evidence": [],
+                    "rationale": f"The seed graph carries no technical signals for {ticker}."}
+        stance = verdict(score, 2, -2)
+        rationale = {
+            "bullish": f"Trend and momentum line up: {'; '.join(evidence)}.",
+            "bearish": f"The tape is broken: {'; '.join(evidence)}.",
+            "neutral": f"Mixed tape - trend up but momentum stalling: {'; '.join(evidence)}.",
+        }[stance]
+        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+
+    if archetype_key == "quality":
+        roe = fund.get("roe", {}).get("value")
+        margin = fund.get("profit_margin", {}).get("value")
+        de = fund.get("debt_to_equity", {}).get("value")
+        evidence, score = [], 0
+        if roe is not None:
+            evidence.append(f"ROE of {_pct(roe, 0)}")
+            score += 2 if roe >= 0.20 else 1 if roe >= 0.12 else -1 if roe < 0.08 else 0
+        if margin is not None:
+            evidence.append(f"profit margin of {_pct(margin)}")
+            score += 2 if margin >= 0.20 else 1 if margin >= 0.10 else -1 if margin < 0.05 else 0
+        if de is not None:
+            evidence.append(f"debt/equity of {de:.2f}")
+            score += -2 if de >= 2.0 else -1 if de >= 1.0 else 1 if de <= 0.5 else 0
+        if not evidence:
+            return {"stance": "neutral", "evidence": [],
+                    "rationale": f"The seed graph carries no profitability metrics for {ticker}."}
+        stance = verdict(score, 3, -1)
+        lev = ""
+        if de is not None and de >= 1.0:
+            lev = f" The debt/equity of {de:.2f} is the one thing that keeps me cautious."
+        rationale = {
+            "bullish": f"Elite profitability - {' and a '.join(evidence)}.{lev}",
+            "bearish": f"Profitability or the balance sheet fall short: {' and a '.join(evidence)}.{lev}",
+            "neutral": f"Decent but not best-in-class: {' and a '.join(evidence)}.{lev}",
+        }[stance]
+        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+
+    if archetype_key == "macro":
+        sector = idx.get("sector")
+        industry = idx.get("industry")
+        mktcap = val.get("market_cap", {}).get("value")
+        evidence = []
+        if sector:
+            evidence.append(f"{sector} sector")
+        if industry:
+            evidence.append(f"{industry} industry")
+        if mktcap is not None:
+            evidence.append(
+                f"market cap of ${mktcap / 1e12:.2f}T" if mktcap >= 1e12
+                else f"market cap of ${mktcap / 1e9:.1f}B"
+            )
+        if not sector:
+            return {"stance": "neutral", "evidence": evidence,
+                    "rationale": f"No sector classification in the seed graph for {ticker}."}
+        secular = {"Technology", "Communication Services", "Consumer Cyclical", "Healthcare"}
+        stance = "bullish" if sector in secular else "neutral"
+        proxy = ""
+        if mktcap is not None and mktcap >= 1e12:
+            proxy = f" At a {evidence[-1]} the name trades as a proxy for large-cap {sector}."
+        rationale = (
+            f"This is really a call on the {sector} sector"
+            + (f" / {industry} industry" if industry else "")
+            + (". That sector still attracts the marginal growth dollar." if stance == "bullish"
+               else ". I have no strong sector edge here right now.")
+            + proxy
+        )
+        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+
+    return {"stance": "neutral", "evidence": [],
+            "rationale": f"Unknown archetype {archetype_key!r}."}
+
+
 @dataclass
 class OasisAgentProfile:
     """OASIS Agent Profile数据结构"""
@@ -892,6 +1204,176 @@ class OasisProfileGenerator:
         """设置图谱ID用于Zep检索"""
         self.graph_id = graph_id
     
+    # ----------------------------------------------------------------------
+    # Phase 3a — one INVESTOR persona per fixed archetype
+    # ----------------------------------------------------------------------
+    def _investor_system_prompt(self) -> str:
+        """System prompt for investor personas.
+
+        Deliberately English (not `get_language_instruction()`): these personas
+        argue an investment thesis that a reviewer checks against USD figures,
+        so the prose stays in the language of the metrics.
+        """
+        return (
+            "You generate INVESTOR personas for a market simulation. Each persona "
+            "argues a position on ONE stock from the viewpoint of a specific, fixed "
+            "investing style. Personas must be grounded in the real figures you are "
+            "given: every persona must quote at least one actual metric value. "
+            "Return valid JSON only, with no unescaped newlines inside string values."
+        )
+
+    def _build_investor_persona_prompt(
+        self,
+        archetype: Dict[str, Any],
+        idx: Dict[str, Any],
+        digest: str,
+        stance_info: Dict[str, Any],
+    ) -> str:
+        ticker = idx.get("ticker") or "the stock"
+        company = idx.get("company_name") or ticker
+        as_of = idx.get("as_of_date") or "the latest available date"
+        evidence = "; ".join(stance_info.get("evidence") or []) or "(no specific figures available)"
+        return f"""Create ONE investor persona for {ticker} ({company}).
+
+INVESTING STYLE (fixed - do not change it): {archetype['name']}
+How this investor thinks: {archetype['lens']}
+
+A quantitative screen in this exact style has already been run on {ticker}. Its verdict:
+  STANCE: {stance_info['stance']}
+  Reasoning: {stance_info['rationale']}
+  Key figures: {evidence}
+
+Full data on {ticker} (as of {as_of}):
+{digest}
+
+Write the persona so that it argues the STANCE above (do not contradict it) and
+stays fully in character for a {archetype['name']}.
+
+Return a JSON object with exactly these string/array fields:
+  "bio": one or two sentences, first person. MUST quote at least one real figure
+         from the data above (the actual P/E, the actual RSI, etc.). No generic filler.
+  "persona": 150-280 words, first person, ONE paragraph, no line breaks. Explain who
+             this investor is, how they read {ticker} right now, and which specific
+             numbers drive their {stance_info['stance']} view. Quote at least two real figures.
+  "interested_topics": array of 3 to 6 short strings.
+"""
+
+    def _investor_persona_rule_based(
+        self,
+        archetype: Dict[str, Any],
+        idx: Dict[str, Any],
+        stance_info: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Template persona - no LLM. Still cites real figures via `evidence`."""
+        ticker = idx.get("ticker") or "the stock"
+        as_of = idx.get("as_of_date") or "the latest data"
+        evidence = stance_info.get("evidence") or []
+        stance = stance_info["stance"]
+
+        # Lead the bio with figures that carry an actual number where possible.
+        with_digit = [e for e in evidence if any(ch.isdigit() for ch in e)]
+        lead = (with_digit or evidence)[:2]
+        if lead:
+            cited = " and ".join(lead)
+            cited = cited[0].upper() + cited[1:]
+            bio = f"{archetype['name']} on {ticker}: {stance}. {cited} anchor my view."
+        else:
+            fallback = idx.get("sector") or idx.get("company_name") or ticker
+            bio = f"{archetype['name']} watching {ticker} ({fallback}); {stance} for now."
+
+        persona = (
+            f"{archetype['lens']} "
+            f"My read on {ticker} as of {as_of}: {stance_info['rationale']} "
+            + (f"The figures that matter to me: {'; '.join(evidence)}. " if evidence else "")
+            + f"That puts me {stance} on the stock right now."
+        )
+        return {"bio": bio, "persona": persona, "interested_topics": list(archetype["topics"])}
+
+    def generate_investor_persona(
+        self,
+        archetype: Dict[str, Any],
+        idx: Dict[str, Any],
+        digest: str,
+        user_id: int,
+        use_llm: bool = True,
+    ) -> OasisAgentProfile:
+        """Build one `OasisAgentProfile` for a single investor archetype.
+
+        The bullish/neutral/bearish stance is derived deterministically from the
+        seed graph (`_derive_investor_stance`); the LLM only writes prose around
+        it. Object shape is unchanged - the archetype lands in `profession`, the
+        stance is the first `interested_topics` entry (``"stance: bearish"``).
+        """
+        ticker = idx.get("ticker") or "STOCK"
+        stance_info = _derive_investor_stance(archetype["key"], idx)
+        stance = stance_info["stance"]
+
+        data: Dict[str, Any] = {}
+        if use_llm:
+            try:
+                data = self._investor_persona_via_llm(archetype, idx, digest, stance_info)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "investor persona LLM failed (%s / %s): %s - using template",
+                    ticker, archetype["key"], str(exc)[:120],
+                )
+        if not data.get("bio") or not data.get("persona"):
+            data = self._investor_persona_rule_based(archetype, idx, stance_info)
+
+        name = f"{archetype['name']} · {ticker}"
+        topics = [f"stance: {stance}"] + _coerce_to_str_list(
+            data.get("interested_topics") or archetype["topics"]
+        )
+        return OasisAgentProfile(
+            user_id=user_id,
+            user_name=self._generate_username(name),
+            name=name,
+            bio=data.get("bio", ""),
+            persona=data.get("persona", ""),
+            mbti=archetype["mbti"],
+            profession=archetype["name"],
+            interested_topics=topics,
+            source_entity_uuid=f"{ticker}::investor::{archetype['key']}",
+            source_entity_type="InvestorArchetype",
+        )
+
+    def _investor_persona_via_llm(
+        self,
+        archetype: Dict[str, Any],
+        idx: Dict[str, Any],
+        digest: str,
+        stance_info: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        prompt = self._build_investor_persona_prompt(archetype, idx, digest, stance_info)
+        last_error: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                response = create_chat_completion(
+                    self.client,
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": self._investor_system_prompt()},
+                        {"role": "user", "content": prompt},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.6 - attempt * 0.2,
+                )
+                content = extract_chat_completion_text(response)
+                if response.choices[0].finish_reason == "length":
+                    content = self._fix_truncated_json(content)
+                try:
+                    result = json.loads(content)
+                except json.JSONDecodeError:
+                    result = self._try_fix_json(content, archetype["name"], "InvestorArchetype")
+                    result.pop("_fixed", None)
+                if result.get("bio") and result.get("persona"):
+                    return result
+                last_error = ValueError("LLM response missing bio/persona")
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                time.sleep(attempt + 1)
+        raise last_error or RuntimeError("investor persona generation failed")
+
     def generate_profiles_from_entities(
         self,
         entities: List[EntityNode],
@@ -903,28 +1385,39 @@ class OasisProfileGenerator:
         output_platform: str = "reddit"
     ) -> List[OasisAgentProfile]:
         """
-        批量从实体生成Agent Profile（支持并行生成）
-        
+        Generate INVESTOR personas from a financial seed graph (Phase 3a).
+
+        Signature and role in the pipeline are unchanged - `simulation_manager`
+        still calls this with `entities=filtered.entities`. What changed: instead
+        of one social-media persona per entity, this now produces exactly one
+        persona per fixed investor archetype in `INVESTOR_ARCHETYPES`, each
+        grounded in the real figures carried by `entities` (the whole seed
+        graph), with a stance derived deterministically from those figures.
+
         Args:
-            entities: 实体列表
-            use_llm: 是否使用LLM生成详细人设
-            progress_callback: 进度回调函数 (current, total, message)
-            graph_id: 图谱ID，用于Zep检索获取更丰富上下文
-            parallel_count: 并行生成数量，默认5
-            realtime_output_path: 实时写入的文件路径（如果提供，每生成一个就写入一次）
-            output_platform: 输出平台格式 ("reddit" 或 "twitter")
-            
+            entities: the seed graph as a flat `List[EntityNode]`
+                (`build_seed_from_ticker(...).entities`).
+            use_llm: True = LLM writes the persona prose around the derived
+                stance; False = deterministic template (still cites real figures).
+            progress_callback: (current, total, message).
+            graph_id: accepted for signature compatibility; unused (the full
+                graph is already in `entities`).
+            parallel_count: thread-pool width.
+            realtime_output_path / output_platform: unchanged incremental dump.
+
         Returns:
-            Agent Profile列表
+            `List[OasisAgentProfile]`, one per archetype, in `INVESTOR_ARCHETYPES`
+            order.
         """
         import concurrent.futures
         from threading import Lock
-        
-        # 设置graph_id用于Zep检索
-        if graph_id:
-            self.graph_id = graph_id
-        
-        total = len(entities)
+
+        idx = _index_seed_entities(entities)
+        digest = _seed_digest(idx)
+        ticker = idx.get("ticker") or "STOCK"
+
+        archetypes = list(INVESTOR_ARCHETYPES)
+        total = len(archetypes)
         profiles = [None] * total  # 预分配列表保持顺序
         completed_count = [0]  # 使用列表以便在闭包中修改
         lock = Lock()
@@ -963,98 +1456,99 @@ class OasisProfileGenerator:
         # Capture locale before spawning thread pool workers
         current_locale = get_locale()
 
-        def generate_single_profile(idx: int, entity: EntityNode) -> tuple:
-            """生成单个profile的工作函数"""
+        def generate_single_persona(position: int, archetype: Dict[str, Any]) -> tuple:
+            """Worker: build one persona for one archetype."""
             set_locale(current_locale)
-            entity_type = entity.get_entity_type() or "Entity"
-            
             try:
-                profile = self.generate_profile_from_entity(
-                    entity=entity,
-                    user_id=idx,
-                    use_llm=use_llm
+                profile = self.generate_investor_persona(
+                    archetype=archetype,
+                    idx=idx,
+                    digest=digest,
+                    user_id=position,
+                    use_llm=use_llm,
                 )
-                
-                # 实时输出生成的人设到控制台和日志
-                self._print_generated_profile(entity.name, entity_type, profile)
-                
-                return idx, profile, None
-                
-            except Exception as e:
-                logger.error(f"生成实体 {entity.name} 的人设失败: {str(e)}")
-                # 创建一个基础profile
+                stance = profile.interested_topics[0] if profile.interested_topics else "stance: n/a"
+                self._print_generated_profile(profile.name, f"{archetype['name']} / {stance}", profile)
+                return position, profile, None
+            except Exception as e:  # noqa: BLE001
+                logger.error(f"生成 {archetype['name']} ({ticker}) 人设失败: {str(e)}")
+                stance_info = _derive_investor_stance(archetype["key"], idx)
+                data = self._investor_persona_rule_based(archetype, idx, stance_info)
+                name = f"{archetype['name']} · {ticker}"
                 fallback_profile = OasisAgentProfile(
-                    user_id=idx,
-                    user_name=self._generate_username(entity.name),
-                    name=entity.name,
-                    bio=f"{entity_type}: {entity.name}",
-                    persona=entity.summary or f"A participant in social discussions.",
-                    source_entity_uuid=entity.uuid,
-                    source_entity_type=entity_type,
+                    user_id=position,
+                    user_name=self._generate_username(name),
+                    name=name,
+                    bio=data["bio"],
+                    persona=data["persona"],
+                    mbti=archetype["mbti"],
+                    profession=archetype["name"],
+                    interested_topics=[f"stance: {stance_info['stance']}"] + list(archetype["topics"]),
+                    source_entity_uuid=f"{ticker}::investor::{archetype['key']}",
+                    source_entity_type="InvestorArchetype",
                 )
-                return idx, fallback_profile, str(e)
-        
-        logger.info(f"开始并行生成 {total} 个Agent人设（并行数: {parallel_count}）...")
+                return position, fallback_profile, str(e)
+
+        logger.info(f"开始并行生成 {total} 个投资者人设（ticker={ticker}, 并行数: {parallel_count}）...")
         print(f"\n{'='*60}")
-        print(f"开始生成Agent人设 - 共 {total} 个实体，并行数: {parallel_count}")
+        print(f"生成投资者人设 - {ticker}: {total} 个原型，并行数: {parallel_count}")
         print(f"{'='*60}\n")
-        
-        # 使用线程池并行执行
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_count) as executor:
-            # 提交所有任务
-            future_to_entity = {
-                executor.submit(generate_single_profile, idx, entity): (idx, entity)
-                for idx, entity in enumerate(entities)
+            future_to_archetype = {
+                executor.submit(generate_single_persona, position, archetype): (position, archetype)
+                for position, archetype in enumerate(archetypes)
             }
-            
-            # 收集结果
-            for future in concurrent.futures.as_completed(future_to_entity):
-                idx, entity = future_to_entity[future]
-                entity_type = entity.get_entity_type() or "Entity"
-                
+
+            for future in concurrent.futures.as_completed(future_to_archetype):
+                position, archetype = future_to_archetype[future]
                 try:
-                    result_idx, profile, error = future.result()
-                    profiles[result_idx] = profile
-                    
+                    result_position, profile, error = future.result()
+                    profiles[result_position] = profile
+
                     with lock:
                         completed_count[0] += 1
                         current = completed_count[0]
-                    
-                    # 实时写入文件
+
                     save_profiles_realtime()
-                    
+
                     if progress_callback:
                         progress_callback(
-                            current, 
-                            total, 
-                            f"已完成 {current}/{total}: {entity.name}（{entity_type}）"
+                            current,
+                            total,
+                            f"已完成 {current}/{total}: {archetype['name']}（{ticker}）",
                         )
-                    
+
                     if error:
-                        logger.warning(f"[{current}/{total}] {entity.name} 使用备用人设: {error}")
+                        logger.warning(f"[{current}/{total}] {archetype['name']} 使用模板人设: {error}")
                     else:
-                        logger.info(f"[{current}/{total}] 成功生成人设: {entity.name} ({entity_type})")
-                        
-                except Exception as e:
-                    logger.error(f"处理实体 {entity.name} 时发生异常: {str(e)}")
+                        logger.info(f"[{current}/{total}] 成功生成人设: {archetype['name']} ({ticker})")
+
+                except Exception as e:  # noqa: BLE001
+                    logger.error(f"处理原型 {archetype['name']} 时发生异常: {str(e)}")
                     with lock:
                         completed_count[0] += 1
-                    profiles[idx] = OasisAgentProfile(
-                        user_id=idx,
-                        user_name=self._generate_username(entity.name),
-                        name=entity.name,
-                        bio=f"{entity_type}: {entity.name}",
-                        persona=entity.summary or "A participant in social discussions.",
-                        source_entity_uuid=entity.uuid,
-                        source_entity_type=entity_type,
+                    stance_info = _derive_investor_stance(archetype["key"], idx)
+                    data = self._investor_persona_rule_based(archetype, idx, stance_info)
+                    name = f"{archetype['name']} · {ticker}"
+                    profiles[position] = OasisAgentProfile(
+                        user_id=position,
+                        user_name=self._generate_username(name),
+                        name=name,
+                        bio=data["bio"],
+                        persona=data["persona"],
+                        mbti=archetype["mbti"],
+                        profession=archetype["name"],
+                        interested_topics=[f"stance: {stance_info['stance']}"] + list(archetype["topics"]),
+                        source_entity_uuid=f"{ticker}::investor::{archetype['key']}",
+                        source_entity_type="InvestorArchetype",
                     )
-                    # 实时写入文件（即使是备用人设）
                     save_profiles_realtime()
-        
+
         print(f"\n{'='*60}")
-        print(f"人设生成完成！共生成 {len([p for p in profiles if p])} 个Agent")
+        print(f"投资者人设生成完成！{ticker}: {len([p for p in profiles if p])} 个")
         print(f"{'='*60}\n")
-        
+
         return profiles
     
     def _print_generated_profile(self, entity_name: str, entity_type: str, profile: OasisAgentProfile):
