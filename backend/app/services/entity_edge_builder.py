@@ -53,6 +53,7 @@ from .financial_entity_extractor import (
     ENTITY_TYPE_COMPANY,
     ENTITY_TYPE_FUNDAMENTAL_METRIC,
     ENTITY_TYPE_SECTOR,
+    ENTITY_TYPE_SHARIA_SCREEN,
     ENTITY_TYPE_TECHNICAL_SIGNAL,
     ENTITY_TYPE_VALUATION_METRIC,
 )
@@ -67,6 +68,7 @@ _EDGE_SPEC: Dict[str, Tuple[str, str]] = {
     ENTITY_TYPE_VALUATION_METRIC: ("has_metric", "valuation metric"),
     ENTITY_TYPE_FUNDAMENTAL_METRIC: ("has_metric", "fundamental metric"),
     ENTITY_TYPE_TECHNICAL_SIGNAL: ("has_signal", "technical signal"),
+    ENTITY_TYPE_SHARIA_SCREEN: ("has_screen", "compliance screen"),
 }
 
 

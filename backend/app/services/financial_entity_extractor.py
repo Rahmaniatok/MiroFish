@@ -60,6 +60,10 @@ ENTITY_TYPE_SECTOR = "Sector"
 ENTITY_TYPE_VALUATION_METRIC = "ValuationMetric"
 ENTITY_TYPE_FUNDAMENTAL_METRIC = "FundamentalMetric"
 ENTITY_TYPE_TECHNICAL_SIGNAL = "TechnicalSignal"
+# Phase 3d: the AAOIFI SS-21 compliance screen (Phase 1g) folded into the seed
+# graph as a first-class entity, so the Sharia compliance persona ("Gamma") can
+# read its verdict from the entity list like every other persona reads metrics.
+ENTITY_TYPE_SHARIA_SCREEN = "ShariaScreen"
 
 FINANCIAL_ENTITY_TYPES = (
     ENTITY_TYPE_COMPANY,
@@ -67,6 +71,7 @@ FINANCIAL_ENTITY_TYPES = (
     ENTITY_TYPE_VALUATION_METRIC,
     ENTITY_TYPE_FUNDAMENTAL_METRIC,
     ENTITY_TYPE_TECHNICAL_SIGNAL,
+    ENTITY_TYPE_SHARIA_SCREEN,
 )
 
 # (key di dict fundamental, nama tampilan, unit) — masing-masing jadi SATU
@@ -213,6 +218,64 @@ def _extract_sector_entity(
             "gics_sector": sector,
             "industry": industry if has_industry else None,
             "as_of_date": as_of_label,
+        },
+    )
+
+
+def _extract_sharia_compliance_entity(
+    ticker: str, sharia: Dict[str, Any], as_of_label: str
+) -> Optional[Dict[str, Any]]:
+    """Entity `sharia_screen`: the AAOIFI SS-21 screen result (Phase 1g).
+
+    Carries the screen fields verbatim in `attributes` (no re-computation, no
+    paraphrase) so a downstream consumer can enforce the verdict. Skipped +
+    logged when the screen has no successful result — never fabricated.
+    """
+    if not sharia or not sharia.get("success"):
+        logger.info(
+            "[%s] sharia_compliance absen / gagal (%r) -> entity sharia_screen dilewati",
+            ticker, (sharia or {}).get("error"),
+        )
+        return None
+
+    ratio = sharia.get("debt_to_market_cap")
+    threshold = sharia.get("debt_to_market_cap_threshold")
+    overall = sharia.get("overall_compliant")
+    category = sharia.get("excluded_category")
+
+    verdict_word = (
+        "compliant" if overall is True
+        else "NOT compliant" if overall is False
+        else "indeterminate"
+    )
+    ratio_str = "n/a" if _is_missing(ratio) else f"{float(ratio):.4f}"
+    summary = (
+        f"Sharia screen ({sharia.get('standard') or 'AAOIFI SS-21'}) {ticker}: "
+        f"{verdict_word}. Debt/market-cap {ratio_str}"
+    )
+    if not _is_missing(threshold):
+        summary += f" (AAOIFI cap <{threshold:g})"
+    summary += f"; business-activity exclusion: {category or 'none'}."
+    summary += " PARTIAL screen — some AAOIFI criteria are not computable from the data source."
+
+    return _make_entity(
+        entity_type=ENTITY_TYPE_SHARIA_SCREEN,
+        uuid=f"{ticker}::sharia_screen",
+        name=f"{ticker} Sharia Screen",
+        summary=summary,
+        attributes={
+            "ticker": ticker,
+            "standard": sharia.get("standard"),
+            "debt_to_market_cap": ratio if not _is_missing(ratio) else None,
+            "debt_to_market_cap_threshold": threshold if not _is_missing(threshold) else None,
+            "passes_debt_screen": sharia.get("passes_debt_screen"),
+            "sector_exclusion_flag": sharia.get("sector_exclusion_flag"),
+            "excluded_category": category,
+            "exclusion_reason": sharia.get("exclusion_reason"),
+            "overall_compliant": overall,
+            "is_partial_screen": True,
+            "as_of_date": as_of_label,
+            "is_point_in_time": False,
         },
     )
 
@@ -432,6 +495,8 @@ def extract_financial_entities(stock_context: Dict[str, Any]) -> List[Dict[str, 
                                          debt/equity — hanya yang terisi)
       - technical_signal   : 0..5       (RSI, MACD, price-vs-SMA50/200,
                                          Bollinger %B — dari Phase 1e)
+      - sharia_screen      : 0..1       (AAOIFI SS-21 screen result — Phase 1g;
+                                         hanya bila sharia_compliance.success)
 
     Field null / tidak tersedia -> entitasnya DILEWATI (dicatat via logger),
     tidak dibuat dengan nilai null dan tidak dikarang.
@@ -469,6 +534,13 @@ def extract_financial_entities(stock_context: Dict[str, Any]) -> List[Dict[str, 
 
     # company selalu dibuat (identitas dasar), memakai apa pun yang ada
     entities.append(_extract_company_entity(ticker, fundamental, as_of_label))
+
+    # sharia_compliance (Phase 1g) punya "success" sendiri, lepas dari fundamental
+    sharia_entity = _extract_sharia_compliance_entity(
+        ticker, stock_context.get("sharia_compliance") or {}, as_of_label
+    )
+    if sharia_entity is not None:
+        entities.append(sharia_entity)
 
     if fundamental_ok:
         sector_entity = _extract_sector_entity(ticker, fundamental, as_of_label)

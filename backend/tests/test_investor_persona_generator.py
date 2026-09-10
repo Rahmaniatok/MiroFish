@@ -83,6 +83,25 @@ STOCK_CONTEXT_AAPL = {
         "dividend_yield": 0.0032815575,
         "skipped_fields": {},
     },
+    # Phase 1g shape — AAPL is compliant (Phase 3d adds Gamma as a 6th persona;
+    # these investor tests assert the OTHER 5 are unaffected by its presence).
+    "sharia_compliance": {
+        "ticker": "AAPL",
+        "success": True,
+        "error": None,
+        "standard": "AAOIFI Shari'ah Standard No. 21",
+        "is_point_in_time": False,
+        "debt_to_market_cap": 0.018327,
+        "debt_to_market_cap_threshold": 0.33,
+        "passes_debt_screen": True,
+        "sector": "Technology",
+        "industry": "Consumer Electronics",
+        "sector_exclusion_flag": False,
+        "excluded_category": None,
+        "exclusion_reason": None,
+        "overall_compliant": True,
+        "unavailable_checks": {"impure_income_ratio": "not computable from yfinance"},
+    },
 }
 
 _ARCHETYPE_NAMES = [a["name"] for a in INVESTOR_ARCHETYPES]
@@ -138,11 +157,18 @@ def _stance_of(profile: OasisAgentProfile) -> str:
     return profile.interested_topics[0].split(":", 1)[1].strip()
 
 
-def test_one_persona_per_archetype_with_intact_object_shape(personas):
-    assert len(personas) == len(INVESTOR_ARCHETYPES) == 5
-    assert [p.profession for p in personas] == _ARCHETYPE_NAMES
+def _investors(personas):
+    return [p for p in personas if p.source_entity_type == "InvestorArchetype"]
 
-    for p in personas:
+
+def test_one_persona_per_archetype_with_intact_object_shape(personas):
+    # Phase 3d: 5 investor archetypes + Gamma the compliance monitor.
+    assert len(personas) == len(INVESTOR_ARCHETYPES) + 1 == 6
+    investors = _investors(personas)
+    assert [p.profession for p in investors] == _ARCHETYPE_NAMES
+    assert personas[-1].source_entity_type == "ShariaComplianceVerdict"  # Gamma last
+
+    for p in investors:
         assert isinstance(p, OasisAgentProfile)
         # bentuk objek tidak berubah — field lama masih ada & terisi
         assert p.user_name and p.name and p.bio and p.persona
@@ -156,7 +182,7 @@ def test_one_persona_per_archetype_with_intact_object_shape(personas):
 
 
 def test_stances_are_derived_from_real_aapl_numbers(personas):
-    got = {p.profession: _stance_of(p) for p in personas}
+    got = {p.profession: _stance_of(p) for p in _investors(personas)}
     assert got == _EXPECTED_STANCE
 
 
@@ -171,8 +197,8 @@ def test_stance_derivation_is_deterministic(aapl_seed, capsys):
     run1 = gen.generate_profiles_from_entities(entities=aapl_seed.entities, use_llm=False)
     run2 = gen.generate_profiles_from_entities(entities=aapl_seed.entities, use_llm=False)
 
-    stance1 = {p.profession: _stance_of(p) for p in run1}
-    stance2 = {p.profession: _stance_of(p) for p in run2}
+    stance1 = {p.profession: _stance_of(p) for p in _investors(run1)}
+    stance2 = {p.profession: _stance_of(p) for p in _investors(run2)}
 
     # And the low-level derivation called straight on the indexed seed graph.
     idx = _index_seed_entities(aapl_seed.entities)
@@ -194,7 +220,7 @@ def test_stance_derivation_is_deterministic(aapl_seed, capsys):
 
 
 def test_every_bio_and_persona_cites_a_real_entity_value(personas):
-    for p in personas:
+    for p in _investors(personas):
         text = f"{p.bio}\n{p.persona}"
         assert re.search(r"\d", p.bio), f"{p.profession} bio has no number: {p.bio!r}"
         for needle in _MUST_CITE[p.profession]:
@@ -202,8 +228,21 @@ def test_every_bio_and_persona_cites_a_real_entity_value(personas):
 
 
 def test_viewpoints_are_diverse(personas):
-    stances = {_stance_of(p) for p in personas}
+    stances = {_stance_of(p) for p in _investors(personas)}
     assert len(stances) >= 2, f"all personas share one stance: {stances}"
+
+
+def test_gamma_present_but_does_not_disturb_the_investors(personas):
+    """Phase 3d: the 6th persona is Gamma, clearly separated from the 5 stances."""
+    gamma = [p for p in personas if p.source_entity_type == "ShariaComplianceVerdict"]
+    assert len(gamma) == 1
+    g = gamma[0]
+    assert g.name == "Gamma · AAPL"
+    assert g.interested_topics[0] == "verdict: compliant"   # AAPL fixture is compliant
+    assert not g.interested_topics[0].startswith("stance: ")
+    assert "0.0183" in f"{g.bio}\n{g.persona}"              # real debt/market-cap ratio
+    # the 5 investors are exactly the Phase 3a set, untouched
+    assert {p.profession for p in _investors(personas)} == set(_ARCHETYPE_NAMES)
 
 
 if __name__ == "__main__":

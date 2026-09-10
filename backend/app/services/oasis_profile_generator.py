@@ -171,6 +171,7 @@ def _index_seed_entities(entities: List[EntityNode]) -> Dict[str, Any]:
         "ticker": None, "company_name": None, "sector": None, "industry": None,
         "as_of_date": None,
         "valuation": {}, "fundamental": {}, "technical": {},
+        "sharia": None,
         "summaries": [],
     }
     for entity in entities:
@@ -207,6 +208,18 @@ def _index_seed_entities(entities: List[EntityNode]) -> Dict[str, Any]:
                 "signal": attrs.get("signal"),
                 "summary": entity.summary,
             }
+        elif etype == "ShariaScreen":
+            idx["sharia"] = {
+                "standard": attrs.get("standard"),
+                "debt_to_market_cap": _num(attrs.get("debt_to_market_cap")),
+                "threshold": _num(attrs.get("debt_to_market_cap_threshold")),
+                "passes_debt_screen": attrs.get("passes_debt_screen"),
+                "sector_exclusion_flag": attrs.get("sector_exclusion_flag"),
+                "excluded_category": attrs.get("excluded_category"),
+                "exclusion_reason": attrs.get("exclusion_reason"),
+                "overall_compliant": attrs.get("overall_compliant"),
+                "summary": entity.summary,
+            }
     return idx
 
 
@@ -225,6 +238,9 @@ def _seed_digest(idx: Dict[str, Any]) -> str:
             lines.append(f"{title}:")
             for item in idx[bucket].values():
                 lines.append(f"  - {item['summary']}")
+    if idx.get("sharia"):
+        lines.append("Sharia compliance screen (AAOIFI SS-21):")
+        lines.append(f"  - {idx['sharia'].get('summary')}")
     return "\n".join(lines)
 
 
@@ -386,6 +402,118 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
 
     return {"stance": "neutral", "evidence": [],
             "rationale": f"Unknown archetype {archetype_key!r}."}
+
+
+# ===========================================================================
+# Phase 3d — "Gamma", the Shari'ah compliance monitor persona
+# ===========================================================================
+# Structurally DIFFERENT from the 5 investor archetypes: Gamma takes part in the
+# debate like the others (visible persona, stated reasoning) but its output is a
+# COMPLIANCE VERDICT (compliant / non_compliant / indeterminate), not a
+# bullish/neutral/bearish stance. Phase 5 enforces that verdict as a HARD FILTER
+# rather than blending it into consensus scoring. The verdict is derived
+# deterministically from the seed graph's ShariaScreen entity
+# (`_derive_sharia_verdict`) BEFORE any LLM call — same stance-before-LLM pattern
+# as `_derive_investor_stance`. The LLM (if used) only writes Gamma's prose.
+#
+# Phase-5 discriminators (all three set, narrowly extending the Phase 3a
+# convention — no new object type):
+#   - source_entity_type == "ShariaComplianceVerdict"   (investors: "InvestorArchetype")
+#   - interested_topics[0] == "verdict: <compliant|non_compliant|indeterminate|unknown>"
+#                                                        (investors: "stance: <...>")
+#   - source_entity_uuid == f"{ticker}::sharia::verdict"
+# ---------------------------------------------------------------------------
+
+SHARIA_VERDICT_ENTITY_TYPE = "ShariaComplianceVerdict"
+
+GAMMA_ARCHETYPE: Dict[str, Any] = {
+    "key": "sharia",
+    "name": "Sharia Compliance Monitor",
+    "persona_name": "Gamma",
+    "mbti": "ISTJ",
+    "topics": ["AAOIFI SS-21", "debt/market-cap screen", "business-activity screen"],
+    "lens": (
+        "Not an investor - a binding compliance gate. Screens the stock against "
+        "AAOIFI Shari'ah Standard No. 21: the interest-bearing-debt-to-market-cap "
+        "ratio and prohibited business activity. Gamma's verdict is enforced as a "
+        "hard filter, not weighed against the investment case - a non-compliant "
+        "name is excluded no matter how attractive the other personas find it."
+    ),
+}
+
+
+def _derive_sharia_verdict(idx: Dict[str, Any]) -> Dict[str, Any]:
+    """Deterministic compliant / non_compliant / indeterminate / unknown verdict.
+
+    Reads only the ShariaScreen entity folded into the seed graph (Phase 3d
+    extractor); `overall_compliant` is treated as authoritative (it is already
+    marked PARTIAL upstream and we do not pretend otherwise). Returns
+    {"verdict", "rationale", "evidence": [...]} with real figures in `evidence`
+    and the reason taken verbatim from `exclusion_reason` / the failed ratio -
+    never paraphrased vaguer. No LLM, no randomness.
+    """
+    sc = idx.get("sharia")
+    ticker = idx.get("ticker") or "the stock"
+    if not sc:
+        return {
+            "verdict": "unknown",
+            "rationale": (
+                f"No Shari'ah screen data in the seed graph for {ticker}; "
+                f"compliance cannot be asserted."
+            ),
+            "evidence": [],
+        }
+
+    ratio = sc.get("debt_to_market_cap")
+    threshold = sc.get("threshold") or 0.33
+    excluded = bool(sc.get("sector_exclusion_flag"))
+    category = sc.get("excluded_category")
+    reason = sc.get("exclusion_reason")
+    passes_debt = sc.get("passes_debt_screen")
+    overall = sc.get("overall_compliant")
+
+    evidence: List[str] = []
+    if ratio is not None:
+        evidence.append(
+            f"debt/market-cap of {ratio:.4f} against the {threshold:g} AAOIFI cap"
+        )
+    if excluded:
+        evidence.append(f"prohibited business activity ({category})")
+
+    if overall is True:
+        verdict = "compliant"
+        bits = []
+        if ratio is not None:
+            bits.append(
+                f"debt/market-cap {ratio:.4f} is within the {threshold:g} AAOIFI cap"
+            )
+        bits.append("no prohibited business activity")
+        rationale = (
+            "Passes both screens that can be run: " + ", and ".join(bits) + ". "
+            "PARTIAL screen - some AAOIFI criteria are not computable from the "
+            "data source, so this is a clearance on the checks available, not a full audit."
+        )
+    elif overall is False:
+        verdict = "non_compliant"
+        if excluded and reason:
+            rationale = f"Excluded on business activity: {reason}"
+        elif passes_debt is False and ratio is not None:
+            rationale = (
+                f"Fails the debt screen: debt/market-cap of {ratio:.4f} exceeds "
+                f"the {threshold:g} AAOIFI cap."
+            )
+        elif reason:
+            rationale = f"Non-compliant: {reason}"
+        else:
+            rationale = "Marked non-compliant by the AAOIFI SS-21 screen."
+    else:  # overall is None
+        verdict = "indeterminate"
+        rationale = (
+            f"The debt/market-cap ratio could not be computed for {ticker} and "
+            f"there is no business-activity exclusion; compliance cannot be confirmed."
+        )
+
+    return {"verdict": verdict, "rationale": rationale, "evidence": evidence}
 
 
 @dataclass
@@ -1374,6 +1502,175 @@ Return a JSON object with exactly these string/array fields:
                 time.sleep(attempt + 1)
         raise last_error or RuntimeError("investor persona generation failed")
 
+    # ----------------------------------------------------------------------
+    # Phase 3d — "Gamma", the Sharia compliance monitor persona
+    # ----------------------------------------------------------------------
+    def _sharia_system_prompt(self) -> str:
+        return (
+            "You write the first-person statement for a Shari'ah COMPLIANCE MONITOR "
+            "persona named Gamma in a market simulation. Gamma is NOT an investor - it "
+            "is a binding compliance gate. The compliance verdict is ALREADY DECIDED "
+            "and handed to you; do NOT re-judge it, soften it, or hedge it. Your only "
+            "job is to write Gamma's explanation, quoting the real screening figures "
+            "(the actual debt/market-cap ratio, the actual excluded category). Return "
+            "valid JSON only, with no unescaped newlines inside string values."
+        )
+
+    def _build_sharia_persona_prompt(
+        self, idx: Dict[str, Any], digest: str, verdict_info: Dict[str, Any]
+    ) -> str:
+        ticker = idx.get("ticker") or "the stock"
+        company = idx.get("company_name") or ticker
+        as_of = idx.get("as_of_date") or "the latest available data"
+        sc = idx.get("sharia") or {}
+        evidence = "; ".join(verdict_info.get("evidence") or []) or "(screen figures unavailable)"
+        return f"""Write the persona for GAMMA, the Shari'ah compliance monitor, screening {ticker} ({company}).
+
+The screen (AAOIFI Shari'ah Standard No. 21) has ALREADY been run. Its result:
+  VERDICT: {verdict_info['verdict']}
+  Reason: {verdict_info['rationale']}
+  Screening figures: {evidence}
+  Raw screen fields: debt_to_market_cap={sc.get('debt_to_market_cap')!r},
+    threshold={sc.get('threshold')!r}, passes_debt_screen={sc.get('passes_debt_screen')!r},
+    sector_exclusion_flag={sc.get('sector_exclusion_flag')!r},
+    excluded_category={sc.get('excluded_category')!r},
+    overall_compliant={sc.get('overall_compliant')!r}
+
+Full data on {ticker} (as of {as_of}):
+{digest}
+
+Gamma's role: {GAMMA_ARCHETYPE['lens']}
+
+Write the persona so it states and defends the VERDICT above (never contradicts it),
+and makes clear the verdict is a HARD FILTER, not one opinion among the investors.
+
+Return a JSON object with exactly these fields:
+  "bio": one or two sentences, first person. MUST quote the actual debt/market-cap
+         ratio, and the excluded category if the verdict is non_compliant. No vague filler.
+  "persona": 150-280 words, first person, ONE paragraph, no line breaks. Who Gamma is,
+             the exact screen result for {ticker}, which real figures decide it, and why
+             the verdict binds regardless of the investment case. Quote at least two real figures.
+  "interested_topics": array of 3 to 6 short strings.
+"""
+
+    def _sharia_persona_rule_based(
+        self, idx: Dict[str, Any], verdict_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Template Gamma persona - no LLM. Cites the real screen figures."""
+        ticker = idx.get("ticker") or "the stock"
+        as_of = idx.get("as_of_date") or "the latest data"
+        sc = idx.get("sharia") or {}
+        verdict = verdict_info["verdict"]
+        verdict_word = verdict.replace("_", "-")
+        evidence = verdict_info.get("evidence") or []
+        ratio = sc.get("debt_to_market_cap")
+        category = sc.get("excluded_category")
+
+        cited = []
+        if ratio is not None:
+            cited.append(f"debt/market-cap {ratio:.4f}")
+        if verdict == "non_compliant" and category:
+            cited.append(f"business-activity exclusion: {category}")
+        cited_str = "; ".join(cited) if cited else "screen figures unavailable"
+
+        bio = (
+            f"I am Gamma, the AAOIFI SS-21 compliance gate on {ticker}. "
+            f"Verdict: {verdict_word}. {cited_str[0].upper() + cited_str[1:]}."
+        )
+        persona = (
+            f"{GAMMA_ARCHETYPE['lens']} "
+            f"For {ticker} as of {as_of} my verdict is {verdict_word}: {verdict_info['rationale']} "
+            + (f"Screening figures: {'; '.join(evidence)}. " if evidence else "")
+            + "This verdict is a hard gate for portfolio construction - it is not weighed "
+            "against the investment personas' views; if it reads non-compliant the name is "
+            "dropped no matter how bullish the rest of the room is."
+        )
+        return {
+            "bio": bio,
+            "persona": persona,
+            "interested_topics": list(GAMMA_ARCHETYPE["topics"]),
+        }
+
+    def _sharia_persona_via_llm(
+        self, idx: Dict[str, Any], digest: str, verdict_info: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        prompt = self._build_sharia_persona_prompt(idx, digest, verdict_info)
+        last_error: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                response = create_chat_completion(
+                    self.client,
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": self._sharia_system_prompt()},
+                        {"role": "user", "content": prompt},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.5 - attempt * 0.2,
+                )
+                content = extract_chat_completion_text(response)
+                if response.choices[0].finish_reason == "length":
+                    content = self._fix_truncated_json(content)
+                try:
+                    result = json.loads(content)
+                except json.JSONDecodeError:
+                    result = self._try_fix_json(content, "Gamma", SHARIA_VERDICT_ENTITY_TYPE)
+                    result.pop("_fixed", None)
+                if result.get("bio") and result.get("persona"):
+                    return result
+                last_error = ValueError("LLM response missing bio/persona")
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                time.sleep(attempt + 1)
+        raise last_error or RuntimeError("sharia persona generation failed")
+
+    def generate_sharia_persona(
+        self,
+        idx: Dict[str, Any],
+        digest: str,
+        user_id: int,
+        use_llm: bool = True,
+    ) -> OasisAgentProfile:
+        """Build Gamma's `OasisAgentProfile` from the seed graph's ShariaScreen entity.
+
+        Verdict is derived by `_derive_sharia_verdict` before any LLM call. Object
+        shape is unchanged; Phase-5 discriminators (see the GAMMA_ARCHETYPE block)
+        are set so the verdict is programmatically distinguishable from the 5
+        investor stances.
+        """
+        ticker = idx.get("ticker") or "STOCK"
+        verdict_info = _derive_sharia_verdict(idx)
+        verdict = verdict_info["verdict"]
+
+        data: Dict[str, Any] = {}
+        if use_llm and verdict != "unknown":
+            try:
+                data = self._sharia_persona_via_llm(idx, digest, verdict_info)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "sharia persona LLM failed (%s): %s - using template",
+                    ticker, str(exc)[:120],
+                )
+        if not data.get("bio") or not data.get("persona"):
+            data = self._sharia_persona_rule_based(idx, verdict_info)
+
+        name = f"Gamma · {ticker}"
+        topics = [f"verdict: {verdict}"] + _coerce_to_str_list(
+            data.get("interested_topics") or GAMMA_ARCHETYPE["topics"]
+        )
+        return OasisAgentProfile(
+            user_id=user_id,
+            user_name=self._generate_username(name),
+            name=name,
+            bio=data.get("bio", ""),
+            persona=data.get("persona", ""),
+            mbti=GAMMA_ARCHETYPE["mbti"],
+            profession=GAMMA_ARCHETYPE["name"],
+            interested_topics=topics,
+            source_entity_uuid=f"{ticker}::sharia::verdict",
+            source_entity_type=SHARIA_VERDICT_ENTITY_TYPE,
+        )
+
     def generate_profiles_from_entities(
         self,
         entities: List[EntityNode],
@@ -1385,29 +1682,39 @@ Return a JSON object with exactly these string/array fields:
         output_platform: str = "reddit"
     ) -> List[OasisAgentProfile]:
         """
-        Generate INVESTOR personas from a financial seed graph (Phase 3a).
+        Generate the debate roster from a financial seed graph (Phase 3a + 3d).
 
         Signature and role in the pipeline are unchanged - `simulation_manager`
-        still calls this with `entities=filtered.entities`. What changed: instead
-        of one social-media persona per entity, this now produces exactly one
-        persona per fixed investor archetype in `INVESTOR_ARCHETYPES`, each
-        grounded in the real figures carried by `entities` (the whole seed
-        graph), with a stance derived deterministically from those figures.
+        still calls this with `entities=filtered.entities`. One seed graph in,
+        SIX personas out:
+          - positions 0-4: the fixed `INVESTOR_ARCHETYPES` (value / growth /
+            technical / quality / macro), each with a bullish/neutral/bearish
+            stance derived deterministically from the real figures
+            (`_derive_investor_stance`) - see Phase 3a.
+          - position 5: "Gamma", the Shari'ah compliance monitor (Phase 3d),
+            whose compliant / non_compliant / indeterminate verdict is derived
+            from the seed graph's ShariaScreen entity (`_derive_sharia_verdict`).
+            Gamma is marked distinctly (source_entity_type ==
+            "ShariaComplianceVerdict", interested_topics[0] == "verdict: ...")
+            so Phase 5 can enforce it as a hard filter instead of blending it
+            into consensus scoring.
+
+        In every case the verdict/stance is decided BEFORE the LLM runs; the LLM
+        (when `use_llm`) only writes the prose. `use_llm=False` -> deterministic
+        templates that still cite the real figures.
 
         Args:
             entities: the seed graph as a flat `List[EntityNode]`
                 (`build_seed_from_ticker(...).entities`).
-            use_llm: True = LLM writes the persona prose around the derived
-                stance; False = deterministic template (still cites real figures).
+            use_llm: LLM writes prose vs. deterministic template.
             progress_callback: (current, total, message).
-            graph_id: accepted for signature compatibility; unused (the full
-                graph is already in `entities`).
+            graph_id: accepted for signature compatibility; unused.
             parallel_count: thread-pool width.
             realtime_output_path / output_platform: unchanged incremental dump.
 
         Returns:
-            `List[OasisAgentProfile]`, one per archetype, in `INVESTOR_ARCHETYPES`
-            order.
+            `List[OasisAgentProfile]` of length 6: the 5 investor archetypes in
+            `INVESTOR_ARCHETYPES` order, then Gamma.
         """
         import concurrent.futures
         from threading import Lock
@@ -1416,8 +1723,10 @@ Return a JSON object with exactly these string/array fields:
         digest = _seed_digest(idx)
         ticker = idx.get("ticker") or "STOCK"
 
-        archetypes = list(INVESTOR_ARCHETYPES)
-        total = len(archetypes)
+        # 5 investor archetypes + Gamma the compliance monitor at position 5.
+        specs: List[tuple] = [("investor", a) for a in INVESTOR_ARCHETYPES]
+        specs.append(("sharia", GAMMA_ARCHETYPE))
+        total = len(specs)
         profiles = [None] * total  # 预分配列表保持顺序
         completed_count = [0]  # 使用列表以便在闭包中修改
         lock = Lock()
@@ -1456,52 +1765,66 @@ Return a JSON object with exactly these string/array fields:
         # Capture locale before spawning thread pool workers
         current_locale = get_locale()
 
-        def generate_single_persona(position: int, archetype: Dict[str, Any]) -> tuple:
-            """Worker: build one persona for one archetype."""
+        def build_persona(position: int, kind: str, spec: Dict[str, Any]) -> OasisAgentProfile:
+            if kind == "sharia":
+                return self.generate_sharia_persona(
+                    idx=idx, digest=digest, user_id=position, use_llm=use_llm,
+                )
+            return self.generate_investor_persona(
+                archetype=spec, idx=idx, digest=digest, user_id=position, use_llm=use_llm,
+            )
+
+        def fallback_persona(position: int, kind: str, spec: Dict[str, Any]) -> OasisAgentProfile:
+            """Deterministic template persona - shared by the worker and outer handlers."""
+            if kind == "sharia":
+                verdict_info = _derive_sharia_verdict(idx)
+                data = self._sharia_persona_rule_based(idx, verdict_info)
+                name = f"Gamma · {ticker}"
+                return OasisAgentProfile(
+                    user_id=position, user_name=self._generate_username(name), name=name,
+                    bio=data["bio"], persona=data["persona"], mbti=GAMMA_ARCHETYPE["mbti"],
+                    profession=GAMMA_ARCHETYPE["name"],
+                    interested_topics=[f"verdict: {verdict_info['verdict']}"] + list(GAMMA_ARCHETYPE["topics"]),
+                    source_entity_uuid=f"{ticker}::sharia::verdict",
+                    source_entity_type=SHARIA_VERDICT_ENTITY_TYPE,
+                )
+            stance_info = _derive_investor_stance(spec["key"], idx)
+            data = self._investor_persona_rule_based(spec, idx, stance_info)
+            name = f"{spec['name']} · {ticker}"
+            return OasisAgentProfile(
+                user_id=position, user_name=self._generate_username(name), name=name,
+                bio=data["bio"], persona=data["persona"], mbti=spec["mbti"],
+                profession=spec["name"],
+                interested_topics=[f"stance: {stance_info['stance']}"] + list(spec["topics"]),
+                source_entity_uuid=f"{ticker}::investor::{spec['key']}",
+                source_entity_type="InvestorArchetype",
+            )
+
+        def generate_single_persona(position: int, kind: str, spec: Dict[str, Any]) -> tuple:
+            """Worker: build one persona (investor archetype or Gamma)."""
             set_locale(current_locale)
             try:
-                profile = self.generate_investor_persona(
-                    archetype=archetype,
-                    idx=idx,
-                    digest=digest,
-                    user_id=position,
-                    use_llm=use_llm,
-                )
-                stance = profile.interested_topics[0] if profile.interested_topics else "stance: n/a"
-                self._print_generated_profile(profile.name, f"{archetype['name']} / {stance}", profile)
+                profile = build_persona(position, kind, spec)
+                tag = profile.interested_topics[0] if profile.interested_topics else "n/a"
+                self._print_generated_profile(profile.name, f"{spec['name']} / {tag}", profile)
                 return position, profile, None
             except Exception as e:  # noqa: BLE001
-                logger.error(f"生成 {archetype['name']} ({ticker}) 人设失败: {str(e)}")
-                stance_info = _derive_investor_stance(archetype["key"], idx)
-                data = self._investor_persona_rule_based(archetype, idx, stance_info)
-                name = f"{archetype['name']} · {ticker}"
-                fallback_profile = OasisAgentProfile(
-                    user_id=position,
-                    user_name=self._generate_username(name),
-                    name=name,
-                    bio=data["bio"],
-                    persona=data["persona"],
-                    mbti=archetype["mbti"],
-                    profession=archetype["name"],
-                    interested_topics=[f"stance: {stance_info['stance']}"] + list(archetype["topics"]),
-                    source_entity_uuid=f"{ticker}::investor::{archetype['key']}",
-                    source_entity_type="InvestorArchetype",
-                )
-                return position, fallback_profile, str(e)
+                logger.error(f"生成 {spec['name']} ({ticker}) 人设失败: {str(e)}")
+                return position, fallback_persona(position, kind, spec), str(e)
 
-        logger.info(f"开始并行生成 {total} 个投资者人设（ticker={ticker}, 并行数: {parallel_count}）...")
+        logger.info(f"开始并行生成 {total} 个人设（ticker={ticker}, 5 投资者 + Gamma, 并行数: {parallel_count}）...")
         print(f"\n{'='*60}")
-        print(f"生成投资者人设 - {ticker}: {total} 个原型，并行数: {parallel_count}")
+        print(f"生成人设 - {ticker}: 5 投资者原型 + Gamma 合规监督，并行数: {parallel_count}")
         print(f"{'='*60}\n")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_count) as executor:
-            future_to_archetype = {
-                executor.submit(generate_single_persona, position, archetype): (position, archetype)
-                for position, archetype in enumerate(archetypes)
+            future_to_spec = {
+                executor.submit(generate_single_persona, position, kind, spec): (position, kind, spec)
+                for position, (kind, spec) in enumerate(specs)
             }
 
-            for future in concurrent.futures.as_completed(future_to_archetype):
-                position, archetype = future_to_archetype[future]
+            for future in concurrent.futures.as_completed(future_to_spec):
+                position, kind, spec = future_to_spec[future]
                 try:
                     result_position, profile, error = future.result()
                     profiles[result_position] = profile
@@ -1516,37 +1839,23 @@ Return a JSON object with exactly these string/array fields:
                         progress_callback(
                             current,
                             total,
-                            f"已完成 {current}/{total}: {archetype['name']}（{ticker}）",
+                            f"已完成 {current}/{total}: {spec['name']}（{ticker}）",
                         )
 
                     if error:
-                        logger.warning(f"[{current}/{total}] {archetype['name']} 使用模板人设: {error}")
+                        logger.warning(f"[{current}/{total}] {spec['name']} 使用模板人设: {error}")
                     else:
-                        logger.info(f"[{current}/{total}] 成功生成人设: {archetype['name']} ({ticker})")
+                        logger.info(f"[{current}/{total}] 成功生成人设: {spec['name']} ({ticker})")
 
                 except Exception as e:  # noqa: BLE001
-                    logger.error(f"处理原型 {archetype['name']} 时发生异常: {str(e)}")
+                    logger.error(f"处理 {spec['name']} 时发生异常: {str(e)}")
                     with lock:
                         completed_count[0] += 1
-                    stance_info = _derive_investor_stance(archetype["key"], idx)
-                    data = self._investor_persona_rule_based(archetype, idx, stance_info)
-                    name = f"{archetype['name']} · {ticker}"
-                    profiles[position] = OasisAgentProfile(
-                        user_id=position,
-                        user_name=self._generate_username(name),
-                        name=name,
-                        bio=data["bio"],
-                        persona=data["persona"],
-                        mbti=archetype["mbti"],
-                        profession=archetype["name"],
-                        interested_topics=[f"stance: {stance_info['stance']}"] + list(archetype["topics"]),
-                        source_entity_uuid=f"{ticker}::investor::{archetype['key']}",
-                        source_entity_type="InvestorArchetype",
-                    )
+                    profiles[position] = fallback_persona(position, kind, spec)
                     save_profiles_realtime()
 
         print(f"\n{'='*60}")
-        print(f"投资者人设生成完成！{ticker}: {len([p for p in profiles if p])} 个")
+        print(f"人设生成完成！{ticker}: {len([p for p in profiles if p])} 个 (5 投资者 + Gamma)")
         print(f"{'='*60}\n")
 
         return profiles
