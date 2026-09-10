@@ -15,6 +15,14 @@ from .financial_entity_extractor import (
 from .entity_edge_builder import build_entity_edges, count_edges
 from .seed_builder import build_seed_from_ticker, SeedBuildError
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
+from .debate_room import (
+    DebateRoom,
+    DebateTranscript,
+    DebateStatement,
+    DebateError,
+    run_debate,
+    DEFAULT_DEBATE_ROUNDS,
+)
 from .simulation_manager import SimulationManager, SimulationState, SimulationStatus
 from .simulation_config_generator import (
     SimulationConfigGenerator, 
@@ -62,6 +70,12 @@ __all__ = [
     'SeedBuildError',
     'OasisProfileGenerator',
     'OasisAgentProfile',
+    'DebateRoom',
+    'DebateTranscript',
+    'DebateStatement',
+    'DebateError',
+    'run_debate',
+    'DEFAULT_DEBATE_ROUNDS',
     'SimulationManager',
     'SimulationState',
     'SimulationStatus',
