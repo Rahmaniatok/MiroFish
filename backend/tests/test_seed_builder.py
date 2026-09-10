@@ -92,12 +92,22 @@ def test_success_returns_filtered_entities_shape(monkeypatch):
         assert isinstance(node, EntityNode)
         assert set(node.to_dict()) == _ENTITY_NODE_KEYS
         assert node.labels[-1] == "Entity"
-        # Phase 2c belum jalan: edge/nodes masih kosong
-        assert node.related_edges == []
-        assert node.related_nodes == []
+        # Phase 2c: edge sudah terisi secara default (bintang berpusat di Company)
+        assert node.related_edges != []
+        assert node.related_nodes != []
         # ticker + as_of_date terbawa di attributes (tidak hilang tanpa wrapper)
         assert node.attributes.get("ticker") == "AAPL"
         assert node.attributes.get("as_of_date") == "2024-06-01"
+
+    # Company terhubung ke semua entitas lain; tiap entitas lain balik ke Company
+    company = next(n for n in seed.entities if n.get_entity_type() == "Company")
+    assert len(company.related_edges) == len(seed.entities) - 1
+    assert all(e["direction"] == "outgoing" for e in company.related_edges)
+    for leaf in seed.entities:
+        if leaf is company:
+            continue
+        assert [e["direction"] for e in leaf.related_edges] == ["incoming"]
+        assert leaf.related_edges[0]["source_node_uuid"] == company.uuid
 
 
 def test_entity_types_match_phase_2a(monkeypatch):

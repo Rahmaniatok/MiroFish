@@ -34,17 +34,21 @@ menggantikan peran langkah (1)+(2) di atas:
   extract_financial_entities()       (Phase 2a)
         |
         v
-  FilteredEntities                   <-- "seed" siap dikonsumsi Phase 2c
-                                         (pembangunan edge antar entitas)
+  build_entity_edges()               (Phase 2c) — isi related_edges/related_nodes
+        |
+        v
+  FilteredEntities                   <-- "seed" graph siap dikonsumsi tahap
+                                         berikutnya (persona / simulasi)
 
 KONTRAK OUTPUT: `FilteredEntities` — struktur BUNDEL ENTITAS yang sudah
 dipakai MiroFish sebagai input tahap graph-building (lihat
 `zep_entity_reader.FilteredEntities` dan `build_filtered_entities` di
 Phase 2a). TIDAK ada struktur "Seed" baru yang diciptakan.
 
-Phase 2c (pembangunan edge / `related_edges` / `related_nodes`), persona,
-dan simulasi TIDAK disentuh modul ini — berhenti tepat setelah menghasilkan
-`FilteredEntities` yang berbentuk benar.
+Sejak Phase 2c, `build_seed_from_ticker()` juga memanggil `build_entity_edges()`
+(modul `entity_edge_builder`) sehingga `related_edges` / `related_nodes` sudah
+TERISI secara default — bintang struktural berpusat di Company. Persona dan
+simulasi tetap TIDAK disentuh modul ini.
 ============================================================================
 """
 
@@ -52,6 +56,7 @@ from typing import Any, Dict, Optional
 
 from ..data_layer.market_data import get_stock_context
 from ..utils.logger import get_logger
+from .entity_edge_builder import build_entity_edges
 from .financial_entity_extractor import build_filtered_entities
 from .zep_entity_reader import FilteredEntities
 
@@ -88,7 +93,8 @@ def build_seed_from_ticker(
     Langkah:
       1. `get_stock_context(ticker, as_of_date)`  (data layer Phase 1)
       2. `extract_financial_entities()` via `build_filtered_entities()` (Phase 2a)
-      3. kembalikan `FilteredEntities` — bentuk yang dikonsumsi Phase 2c.
+      3. `build_entity_edges()` (Phase 2c) — isi related_edges/related_nodes
+      4. kembalikan `FilteredEntities` — graph berbentuk lengkap.
 
     Args:
         ticker: kode saham (mis. "AAPL"). Di-normalize upper/strip di
@@ -100,8 +106,8 @@ def build_seed_from_ticker(
 
     Returns:
         `FilteredEntities(entities=[EntityNode...], entity_types, total_count,
-        filtered_count)`. `EntityNode.related_edges` / `.related_nodes` masih
-        kosong — diisi Phase 2c.
+        filtered_count)`. Sejak Phase 2c, `EntityNode.related_edges` /
+        `.related_nodes` sudah TERISI (bintang struktural berpusat di Company).
 
     Raises:
         SeedBuildError: kalau `get_stock_context` melempar exception, ATAU
@@ -159,6 +165,9 @@ def build_seed_from_ticker(
             f"ekstraksi entitas menghasilkan 0 entitas."
         )
 
+    # Phase 2c: isi related_edges / related_nodes (bintang berpusat di Company)
+    build_entity_edges(seed)
+
     logger.info(
         "[%s] seed dibangun @ %s: %d entitas, tipe=%s",
         ticker_label, as_of_date or "live", seed.filtered_count,
@@ -198,7 +207,12 @@ if __name__ == "__main__":
             print(f"      labels              : {node.labels}")
             print(f"      summary             : {node.summary}")
             print(f"      attributes          : {json.dumps(node.attributes, ensure_ascii=False)}")
-            print(f"      related_edges/nodes : {node.related_edges} / {node.related_nodes}  (diisi Phase 2c)")
+            print(f"      related_edges       : {json.dumps(node.related_edges, ensure_ascii=False)}")
+            print(f"      related_nodes       : {json.dumps(node.related_nodes, ensure_ascii=False)}")
 
-    print(f"\n{'=' * 72}\nseed.to_dict() — bentuk persis yang dikonsumsi Phase 2c\n{'=' * 72}")
+    from .entity_edge_builder import count_edges
+    print(f"\n{'=' * 72}\nPhase 2c — struktur edge\n{'=' * 72}")
+    print(f"total edge (unik) dalam graph : {count_edges(seed)}")
+
+    print(f"\n{'=' * 72}\nseed.to_dict() — bentuk persis yang dikonsumsi tahap berikutnya\n{'=' * 72}")
     print(json.dumps(seed.to_dict(), ensure_ascii=False, indent=2))
