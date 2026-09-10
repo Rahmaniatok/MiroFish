@@ -12,6 +12,7 @@ from .financial_entity_extractor import (
     build_filtered_entities,
     FINANCIAL_ENTITY_TYPES,
 )
+from .seed_builder import build_seed_from_ticker, SeedBuildError
 from .oasis_profile_generator import OasisProfileGenerator, OasisAgentProfile
 from .simulation_manager import SimulationManager, SimulationState, SimulationStatus
 from .simulation_config_generator import (
@@ -54,6 +55,8 @@ __all__ = [
     'extract_financial_entity_nodes',
     'build_filtered_entities',
     'FINANCIAL_ENTITY_TYPES',
+    'build_seed_from_ticker',
+    'SeedBuildError',
     'OasisProfileGenerator',
     'OasisAgentProfile',
     'SimulationManager',

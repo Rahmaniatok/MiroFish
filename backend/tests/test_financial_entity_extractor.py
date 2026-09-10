@@ -79,7 +79,7 @@ def test_output_preserves_entitynode_schema():
             ENTITY_TYPE_COMPANY, ENTITY_TYPE_SECTOR, ENTITY_TYPE_VALUATION_METRIC,
             ENTITY_TYPE_FUNDAMENTAL_METRIC, ENTITY_TYPE_TECHNICAL_SIGNAL,
         }
-        assert entity["related_edges"] == []              # Phase 2b
+        assert entity["related_edges"] == []              # Phase 2c
         assert entity["related_nodes"] == []
         # round-trip lewat EntityNode -> get_entity_type() tetap bekerja
         node = EntityNode(

@@ -36,7 +36,7 @@ berikutnya. Modul INI meng-adaptasi peran tersebut, TANPA menulis ulang:
                  saham — bukan aktor sosial / opini.
 
 Konstruksi RELASI / EDGE antar entitas SENGAJA tidak dilakukan di sini —
-itu Phase 2b. `related_edges` / `related_nodes` selalu dikembalikan kosong.
+itu Phase 2c. `related_edges` / `related_nodes` selalu dikembalikan kosong.
 
 Persona generation, simulasi, dan report generation TIDAK disentuh modul ini.
 ============================================================================
@@ -129,7 +129,7 @@ def _make_entity(
     Rakit satu entitas dalam skema EntityNode (lihat
     zep_entity_reader.EntityNode.to_dict). Dibangun lewat EntityNode supaya
     skemanya dijamin identik dengan entitas hasil pipeline Zep — termasuk
-    `related_edges` / `related_nodes` yang kosong (diisi Phase 2b nanti).
+    `related_edges` / `related_nodes` yang kosong (diisi Phase 2c nanti).
     """
     node = EntityNode(
         uuid=uuid,
@@ -436,7 +436,7 @@ def extract_financial_entities(stock_context: Dict[str, Any]) -> List[Dict[str, 
     Field null / tidak tersedia -> entitasnya DILEWATI (dicatat via logger),
     tidak dibuat dengan nilai null dan tidak dikarang.
 
-    Konstruksi edge antar entitas TIDAK dilakukan di sini (Phase 2b).
+    Konstruksi edge antar entitas TIDAK dilakukan di sini (Phase 2c).
     """
     if not isinstance(stock_context, dict):
         raise TypeError(f"stock_context harus dict, dapat {type(stock_context).__name__}")
@@ -574,7 +574,7 @@ if __name__ == "__main__":
                   f"{json.dumps(entity['attributes'], ensure_ascii=False)}")
             print(f"      related_edges/nodes   : "
                   f"{entity['related_edges']} / {entity['related_nodes']}  "
-                  f"(diisi Phase 2b)")
+                  f"(diisi Phase 2c)")
 
     print(f"\n{'=' * 70}\nFull JSON dump\n{'=' * 70}")
     print(json.dumps(financial_entities, ensure_ascii=False, indent=2))
