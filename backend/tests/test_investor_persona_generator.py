@@ -32,8 +32,11 @@ from app.services.oasis_profile_generator import (
     INVESTOR_ARCHETYPES,
     OasisAgentProfile,
     OasisProfileGenerator,
+    _CONV_FLOOR,
+    _clamp,
     _derive_investor_stance,
     _index_seed_entities,
+    _mean,
 )
 from app.services.seed_builder import build_seed_from_ticker
 
@@ -243,6 +246,152 @@ def test_gamma_present_but_does_not_disturb_the_investors(personas):
     assert "0.0183" in f"{g.bio}\n{g.persona}"              # real debt/market-cap ratio
     # the 5 investors are exactly the Phase 3a set, untouched
     assert {p.profession for p in _investors(personas)} == set(_ARCHETYPE_NAMES)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5a — continuous conviction score alongside the categorical stance
+# ---------------------------------------------------------------------------
+
+# Expected (stance, score) for the AAPL fixture. The stance column is byte-for
+# -byte the Phase 3a `_EXPECTED_STANCE`; the score column is the Phase 5a
+# addition, sanity-checked in the design review:
+#   Value     bearish  -0.83  (P/E 36.7 & P/B 43.5 both far past the bear line)
+#   Growth    bullish  +0.78  (rev +16.4%, EPS +28.7% - EPS term caps at +1.0)
+#   Technical neutral  -0.17  (trend up, but RSI 67 + %B 0.81 lean overbought)
+#   Quality   bullish  +0.84  (ROE/margin cap high; D/E 0.78 shaves ~0.10 off)
+#   Macro     bullish  +0.60  (favoured sector +0.5, mega-cap proxy +0.1)
+_EXPECTED_SCORE = {
+    "Value Investor": -0.833,
+    "Growth Investor": +0.780,
+    "Quality/Profitability Investor": +0.841,
+    "Macro/Sector Investor": +0.600,
+    "Technical Trader": -0.174,
+}
+
+
+def test_stance_score_pairs_for_aapl_are_directionally_and_relatively_sane(aapl_seed, capsys):
+    """Prints all 5 archetypes' (stance, score) side by side for a visual check,
+    then asserts the exact scores plus the invariants Phase 5b relies on."""
+    idx = _index_seed_entities(aapl_seed.entities)
+    rows = {
+        a["name"]: _derive_investor_stance(a["key"], idx)
+        for a in INVESTOR_ARCHETYPES
+    }
+
+    with capsys.disabled():
+        print("\n\n  AAPL @ 2024-06-01 — (stance, score) per investor archetype")
+        print("  " + "-" * 62)
+        print(f"  {'archetype':<32} {'stance':<9} {'score':>7}   sign ok?")
+        print("  " + "-" * 62)
+        for name in _ARCHETYPE_NAMES:
+            info = rows[name]
+            ok = (
+                (info["stance"] == "bullish" and info["score"] > 0)
+                or (info["stance"] == "bearish" and info["score"] < 0)
+                or (info["stance"] == "neutral")
+            )
+            print(f"  {name:<32} {info['stance']:<9} {info['score']:>+7.3f}   {'yes' if ok else 'NO'}")
+        print()
+
+    # (a) categorical label is unchanged from Phase 3a, archetype by archetype
+    assert {n: rows[n]["stance"] for n in _ARCHETYPE_NAMES} == _EXPECTED_STANCE
+
+    # (b) every score is a float inside [-1.0, +1.0]
+    for name in _ARCHETYPE_NAMES:
+        s = rows[name]["score"]
+        assert isinstance(s, float) and -1.0 <= s <= 1.0, f"{name}: score {s!r} out of range"
+
+    # (c) stance and score never disagree in direction
+    for name in _ARCHETYPE_NAMES:
+        stance, score = rows[name]["stance"], rows[name]["score"]
+        if stance == "bullish":
+            assert score > 0, f"{name}: bullish but score {score:+.3f}"
+        elif stance == "bearish":
+            assert score < 0, f"{name}: bearish but score {score:+.3f}"
+
+    # (d) exact scores (deterministic - no randomness, no LLM)
+    for name in _ARCHETYPE_NAMES:
+        assert rows[name]["score"] == pytest.approx(_EXPECTED_SCORE[name], abs=1e-3), (
+            f"{name}: score {rows[name]['score']:+.4f} != {_EXPECTED_SCORE[name]:+.4f}"
+        )
+
+    # (e) additive change only - the Phase 3a/4 fields are all still present
+    for name in _ARCHETYPE_NAMES:
+        assert set(rows[name]) >= {"stance", "rationale", "evidence", "score"}
+
+    # (f) relative conviction: Value's bearish call and Quality's bullish call
+    # are the two highest-magnitude reads (metrics far past threshold on both);
+    # among the bullish calls, the metric-driven ones outrank Macro's
+    # deliberately-coarse fixed score; and the neutral call sits nearest zero.
+    by_magnitude = sorted(_ARCHETYPE_NAMES, key=lambda n: abs(rows[n]["score"]), reverse=True)
+    assert set(by_magnitude[:2]) == {"Value Investor", "Quality/Profitability Investor"}
+    assert rows["Quality/Profitability Investor"]["score"] > rows["Macro/Sector Investor"]["score"]
+    assert rows["Growth Investor"]["score"] > rows["Macro/Sector Investor"]["score"]
+    assert by_magnitude[-1] == "Technical Trader"  # the lone neutral, closest to 0
+
+
+def test_stance_score_is_deterministic(aapl_seed):
+    """Same seed graph => byte-identical score on every call."""
+    idx = _index_seed_entities(aapl_seed.entities)
+    for a in INVESTOR_ARCHETYPES:
+        runs = {_derive_investor_stance(a["key"], idx)["score"] for _ in range(5)}
+        assert len(runs) == 1, f"{a['key']}: score not deterministic: {runs}"
+
+
+def test_sign_guard_fires_on_a_ladder_quantization_edge_case(capsys):
+    """Proof the ±_CONV_FLOOR guard actually does something.
+
+    Synthetic technical case: price is +2% vs both moving averages, so the
+    integer ladder scores +1+1 = +2 -> BULLISH. But RSI is 69 (just under the
+    70 overbought line the ladder rounds to 0), and the continuous RSI term is
+    -(69-50)/20 = -0.95. The raw continuous mean is therefore NEGATIVE while the
+    label is bullish - exactly the mismatch `_sign_guarded_score` exists to
+    catch. Without the guard the score would contradict the stance.
+    """
+    idx = {
+        "ticker": "SYNTH",
+        "valuation": {}, "fundamental": {},
+        "technical": {
+            "price_vs_sma50": {"value": 2.0},
+            "price_vs_sma200": {"value": 2.0},
+            "rsi_14": {"value": 69.0},
+            "bollinger_position": {"value": 0.5},
+        },
+    }
+    info = _derive_investor_stance("technical", idx)
+
+    # what the continuous mean would have been, with NO guard:
+    raw_terms = [
+        _clamp(2.0 / 10.0),
+        _clamp(2.0 / 10.0),
+        -_clamp((69.0 - 50.0) / 20.0),
+        -_clamp((0.5 - 0.5) / 0.3),
+    ]
+    raw_mean = _mean(raw_terms)
+
+    with capsys.disabled():
+        print(f"\n\n  sign-guard edge case: ladder -> {info['stance']!r}")
+        print(f"    raw continuous mean (unguarded) = {raw_mean:+.4f}  (would contradict the label)")
+        print(f"    guarded score                   = {info['score']:+.4f}\n")
+
+    assert info["stance"] == "bullish"       # ladder: +1 +1 = +2
+    assert raw_mean < 0                       # continuous formula alone disagrees
+    assert info["score"] == pytest.approx(_CONV_FLOOR)   # guard pulled it to the floor
+    assert info["score"] > 0                  # ...and now it agrees with the label
+
+
+def test_sign_guard_is_a_noop_when_formula_already_agrees(aapl_seed):
+    """The guard must not distort scores that are already on the right side -
+    it only ever clamps toward the label, never away from a correct sign."""
+    idx = _index_seed_entities(aapl_seed.entities)
+    # AAPL's 5 archetypes: none of them hit the guard (all |raw| > _CONV_FLOOR
+    # and already sign-consistent), so the printed scores equal the raw means.
+    for a in INVESTOR_ARCHETYPES:
+        info = _derive_investor_stance(a["key"], idx)
+        assert abs(info["score"]) > _CONV_FLOOR, (
+            f"{a['key']}: AAPL score {info['score']:+.3f} sits on the guard floor "
+            f"- expected the raw formula to stand on its own here"
+        )
 
 
 if __name__ == "__main__":

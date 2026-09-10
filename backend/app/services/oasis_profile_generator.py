@@ -248,12 +248,57 @@ def _pct(fraction: Optional[float], digits: int = 1) -> str:
     return "n/a" if fraction is None else f"{fraction * 100:.{digits}f}%"
 
 
+# --- Phase 5a: continuous conviction score alongside the categorical stance ---
+# `_derive_investor_stance` keeps returning the exact bullish/neutral/bearish
+# LABEL it always has (same integer threshold ladder as Phase 3a - every pinned
+# test still passes verbatim). Phase 5a ADDS a `score` field: a float in
+# [-1.0, +1.0] measuring *how far past the neutral threshold* the same raw
+# metrics sit, so Phase 5b can rank candidates by degree of conviction, not just
+# by label. The score is derived from the SAME comparison as the label (same raw
+# values, same threshold constants) and `_sign_guarded_score` guarantees its
+# sign never contradicts the label.
+
+_CONV_FLOOR = 0.05  # min |score| a bullish/bearish label may carry (keeps it off 0.0)
+
+
+def _clamp(x: float, lo: float = -1.0, hi: float = 1.0) -> float:
+    return lo if x < lo else hi if x > hi else x
+
+
+def _mean(terms: List[float]) -> float:
+    return sum(terms) / len(terms) if terms else 0.0
+
+
+def _sign_guarded_score(stance: str, raw: float) -> float:
+    """Clamp the continuous conviction score to [-1, 1] and guarantee its sign
+    never contradicts the categorical `stance`.
+
+    The categorical label stays authoritative - it comes from the integer
+    threshold ladder Phase 3a shipped. This does NOT recompute the label; it
+    only prevents a sign mismatch in the rare quantization-edge case where the
+    ladder rounds a metric's contribution to 0 (e.g. RSI 69 -> ladder 0) while
+    the continuous term for that same metric is clearly non-zero and tips the
+    mean the other way. `_CONV_FLOOR` also keeps a labelled call off exactly
+    0.0 so downstream ranking (Phase 5b) always sees a direction.
+    """
+    score = _clamp(raw)
+    if stance == "bullish":
+        return max(score, _CONV_FLOOR)
+    if stance == "bearish":
+        return min(score, -_CONV_FLOOR)
+    return score
+
+
 def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str, Any]:
     """Deterministic bullish / neutral / bearish call for one archetype.
 
-    Returns {"stance", "rationale", "evidence": [str, ...]} where every
-    `evidence` string embeds a real figure from the seed graph. Same input
-    graph => same stance on every run (no randomness, no LLM).
+    Returns {"stance", "rationale", "evidence": [str, ...], "score": float}.
+    Every `evidence` string embeds a real figure from the seed graph. `score`
+    is a continuous conviction reading in [-1.0, +1.0] derived from the same
+    raw metrics and thresholds as `stance` (Phase 5a) - its sign always agrees
+    with `stance` (bearish => score < 0, bullish => score > 0, neutral => ~0).
+    Same input graph => same stance and same score on every run (no randomness,
+    no LLM).
     """
     val = idx.get("valuation", {})
     fund = idx.get("fundamental", {})
@@ -267,14 +312,20 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
         pe = val.get("pe_ratio", {}).get("value")
         pb = val.get("pb_ratio", {}).get("value")
         evidence, score = [], 0
+        # Continuous: distance of each multiple below/above the bearish/neutral
+        # boundary the ladder uses (P/E 22, P/B 5), normalised by that boundary
+        # and capped at +/-1 so a P/E of 500 cannot produce a score of -20.
+        conv_terms: List[float] = []
         if pe is not None:
             evidence.append(f"P/E of {pe:.1f}")
             score += -2 if pe >= 30 else -1 if pe >= 22 else 1 if pe <= 15 else 0
+            conv_terms.append(_clamp((22.0 - pe) / 22.0))
         if pb is not None:
             evidence.append(f"P/B of {pb:.1f}")
             score += -2 if pb >= 10 else -1 if pb >= 5 else 1 if pb <= 2 else 0
+            conv_terms.append(_clamp((5.0 - pb) / 5.0))
         if not evidence:
-            return {"stance": "neutral", "evidence": [],
+            return {"stance": "neutral", "evidence": [], "score": 0.0,
                     "rationale": f"The seed graph carries no valuation multiples for {ticker}."}
         stance = verdict(score, 2, -2)
         rationale = {
@@ -282,21 +333,27 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
             "bullish": f"A {' and a '.join(evidence)} are undemanding for a business of this quality.",
             "neutral": f"A {' and a '.join(evidence)} are neither cheap nor extreme.",
         }[stance]
-        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+        return {"stance": stance, "rationale": rationale, "evidence": evidence,
+                "score": _sign_guarded_score(stance, _mean(conv_terms))}
 
     if archetype_key == "growth":
         rg = fund.get("revenue_growth_yoy", {}).get("value")
         eg = fund.get("eps_growth", {}).get("value")
         pe = val.get("pe_ratio", {}).get("value")
         evidence, score = [], 0
+        # Continuous: growth relative to a 0.08 pivot ("meaningfully growing"),
+        # scaled by the 0.15 "strong growth" step the ladder rewards with +2.
+        conv_terms = []
         if rg is not None:
             evidence.append(f"revenue growth of {_pct(rg)} YoY")
             score += 2 if rg >= 0.15 else 1 if rg >= 0.08 else -1 if rg < 0 else 0
+            conv_terms.append(_clamp((rg - 0.08) / 0.15))
         if eg is not None:
             evidence.append(f"EPS growth of {_pct(eg)} YoY")
             score += 2 if eg >= 0.15 else 1 if eg >= 0.08 else -1 if eg < 0 else 0
+            conv_terms.append(_clamp((eg - 0.08) / 0.15))
         if not evidence:
-            return {"stance": "neutral", "evidence": [],
+            return {"stance": "neutral", "evidence": [], "score": 0.0,
                     "rationale": f"The seed graph carries no growth metrics for {ticker}."}
         stance = verdict(score, 3, -1)
         if stance == "bullish":
@@ -306,7 +363,8 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
             rationale = f"{' and '.join(evidence).capitalize()} is not the trajectory this style needs."
         else:
             rationale = f"{' and '.join(evidence).capitalize()} is solid but not exceptional."
-        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+        return {"stance": stance, "rationale": rationale, "evidence": evidence,
+                "score": _sign_guarded_score(stance, _mean(conv_terms))}
 
     if archetype_key == "technical":
         evidence, score = [], 0
@@ -315,23 +373,36 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
         macd = tech.get("macd", {})
         rsi = tech.get("rsi_14", {})
         boll = tech.get("bollinger_position", {})
+        # Continuous: mean of per-signal directional strength. Trend distance is
+        # normalised so +/-10% vs the average = full strength; RSI and Bollinger
+        # %B are scaled so their overbought/oversold lines (70/30, 0.8/0.2) map
+        # to +/-1, with the sign flipped because an overbought reading is
+        # BEARISH. MACD stays coarse (+/-0.5 by signal only) - the histogram
+        # magnitude is not comparable across tickers, only its sign is.
+        conv_terms = []
         if s50.get("value") is not None:
             evidence.append(f"price {s50['value']:+.1f}% vs its 50-day average")
             score += 1 if s50["value"] > 0 else -1
+            conv_terms.append(_clamp(s50["value"] / 10.0))
         if s200.get("value") is not None:
             evidence.append(f"price {s200['value']:+.1f}% vs its 200-day average")
             score += 1 if s200["value"] > 0 else -1
+            conv_terms.append(_clamp(s200["value"] / 10.0))
         if macd.get("value") is not None:
             evidence.append(f"MACD histogram at {macd['value']:+.2f} ({macd.get('signal')})")
             score += 1 if macd.get("signal") == "bullish" else -1 if macd.get("signal") == "bearish" else 0
+            conv_terms.append(0.5 if macd.get("signal") == "bullish"
+                              else -0.5 if macd.get("signal") == "bearish" else 0.0)
         if rsi.get("value") is not None:
             evidence.append(f"RSI(14) at {rsi['value']:.0f}")
             score += -1 if rsi["value"] >= 70 else 1 if rsi["value"] <= 30 else 0
+            conv_terms.append(-_clamp((rsi["value"] - 50.0) / 20.0))
         if boll.get("value") is not None:
             evidence.append(f"Bollinger %B at {boll['value']:.2f}")
             score += -1 if boll["value"] >= 0.8 else 1 if boll["value"] <= 0.2 else 0
+            conv_terms.append(-_clamp((boll["value"] - 0.5) / 0.3))
         if not evidence:
-            return {"stance": "neutral", "evidence": [],
+            return {"stance": "neutral", "evidence": [], "score": 0.0,
                     "rationale": f"The seed graph carries no technical signals for {ticker}."}
         stance = verdict(score, 2, -2)
         rationale = {
@@ -339,24 +410,35 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
             "bearish": f"The tape is broken: {'; '.join(evidence)}.",
             "neutral": f"Mixed tape - trend up but momentum stalling: {'; '.join(evidence)}.",
         }[stance]
-        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+        return {"stance": stance, "rationale": rationale, "evidence": evidence,
+                "score": _sign_guarded_score(stance, _mean(conv_terms))}
 
     if archetype_key == "quality":
         roe = fund.get("roe", {}).get("value")
         margin = fund.get("profit_margin", {}).get("value")
         de = fund.get("debt_to_equity", {}).get("value")
         evidence, score = [], 0
+        # Continuous: mean of ROE / margin distance above their +1 ladder pivots
+        # (0.12, 0.10), scaled by 0.20, then a one-way leverage drag - a high
+        # debt/equity only ever pulls the score DOWN, never boosts it, matching
+        # the lens ("a high debt/equity ratio is a red flag even when
+        # profitability looks strong").
+        prof_terms: List[float] = []
         if roe is not None:
             evidence.append(f"ROE of {_pct(roe, 0)}")
             score += 2 if roe >= 0.20 else 1 if roe >= 0.12 else -1 if roe < 0.08 else 0
+            prof_terms.append(_clamp((roe - 0.12) / 0.20))
         if margin is not None:
             evidence.append(f"profit margin of {_pct(margin)}")
             score += 2 if margin >= 0.20 else 1 if margin >= 0.10 else -1 if margin < 0.05 else 0
+            prof_terms.append(_clamp((margin - 0.10) / 0.20))
+        conv_raw = _mean(prof_terms)
         if de is not None:
             evidence.append(f"debt/equity of {de:.2f}")
             score += -2 if de >= 2.0 else -1 if de >= 1.0 else 1 if de <= 0.5 else 0
+            conv_raw -= _clamp(0.35 * max(0.0, de - 0.5), 0.0, 0.6)
         if not evidence:
-            return {"stance": "neutral", "evidence": [],
+            return {"stance": "neutral", "evidence": [], "score": 0.0,
                     "rationale": f"The seed graph carries no profitability metrics for {ticker}."}
         stance = verdict(score, 3, -1)
         lev = ""
@@ -367,7 +449,8 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
             "bearish": f"Profitability or the balance sheet fall short: {' and a '.join(evidence)}.{lev}",
             "neutral": f"Decent but not best-in-class: {' and a '.join(evidence)}.{lev}",
         }[stance]
-        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+        return {"stance": stance, "rationale": rationale, "evidence": evidence,
+                "score": _sign_guarded_score(stance, conv_raw)}
 
     if archetype_key == "macro":
         sector = idx.get("sector")
@@ -384,7 +467,7 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
                 else f"market cap of ${mktcap / 1e9:.1f}B"
             )
         if not sector:
-            return {"stance": "neutral", "evidence": evidence,
+            return {"stance": "neutral", "evidence": evidence, "score": 0.0,
                     "rationale": f"No sector classification in the seed graph for {ticker}."}
         secular = {"Technology", "Communication Services", "Consumer Cyclical", "Healthcare"}
         stance = "bullish" if sector in secular else "neutral"
@@ -398,9 +481,25 @@ def _derive_investor_stance(archetype_key: str, idx: Dict[str, Any]) -> Dict[str
                else ". I have no strong sector edge here right now.")
             + proxy
         )
-        return {"stance": stance, "rationale": rationale, "evidence": evidence}
+        # Continuous score is DELIBERATELY COARSE for this archetype. The only
+        # inputs available are the sector bucket and the market cap - there is
+        # no per-company quantitative metric to grade (no P/E, no growth rate,
+        # no ROE feeds this lens). A finely-scaled score here would be false
+        # precision, so we emit a fixed +0.5 for a favoured sector, nudged to
+        # +0.6 for a mega-cap that trades as a sector proxy, and 0.0 otherwise.
+        # This is an acknowledged limitation of the inputs, not an oversight -
+        # same spirit as Phase 1g's `unavailable_checks` on the Sharia screen.
+        # If Phase 5+ adds sector-level metrics (relative strength, fund flows,
+        # valuation vs sector median), replace this block with a real formula.
+        macro_score = 0.0
+        if sector in secular:
+            macro_score = 0.5
+            if mktcap is not None and mktcap >= 1e12:
+                macro_score += 0.1
+        return {"stance": stance, "rationale": rationale, "evidence": evidence,
+                "score": _sign_guarded_score(stance, macro_score)}
 
-    return {"stance": "neutral", "evidence": [],
+    return {"stance": "neutral", "evidence": [], "score": 0.0,
             "rationale": f"Unknown archetype {archetype_key!r}."}
 
 
