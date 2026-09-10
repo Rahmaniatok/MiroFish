@@ -104,6 +104,138 @@ _UNRELIABLE_FUNDAMENTAL_FIELDS = {
 _FUNDAMENTAL_SCHEMA_VERSION = 2
 
 
+# ============================================================================
+# Phase 1g — SHARIA (ISLAMIC) COMPLIANCE SCREENING
+# ref: AAOIFI Shari'ah Standard No. 21 ("Financial Paper — Shares and Bonds")
+# ============================================================================
+# WHAT THIS COVERS (and, just as importantly, WHAT IT DOES NOT)
+# ----------------------------------------------------------------------------
+# AAOIFI SS-21 share screening has, in practice, two kinds of test:
+#
+#   (A) Business-activity screen  -> is the company's PRIMARY line of business
+#       impermissible? (conventional interest-based finance, alcohol, tobacco,
+#       gambling, pork, adult entertainment, weapons, ...). We implement this
+#       for the subset the task asked for — conventional financials, alcohol,
+#       tobacco, gambling, defense/weapons — as an EXPLICIT, auditable mapping
+#       from the yfinance sector/industry taxonomy (see _SHARIA_* dicts below).
+#       No LLM, no keyword-guessing on free-text company descriptions.
+#
+#   (B) Financial-ratio screens  -> AAOIFI caps, roughly:
+#         - interest-bearing debt / market cap            < 33%
+#         - (cash + interest-bearing securities) / mcap   < 30%
+#         - impure (interest / non-compliant) income      <  5% of total income
+#       We can ONLY compute the first one here (debt_to_market_cap), because
+#       yfinance exposes totalDebt + marketCap but NOT a breakdown of
+#       interest-bearing investments or a line-item income statement. The rest
+#       are returned in `unavailable_checks` as EXPLICITLY NOT COMPUTED — never
+#       estimated or fabricated (same philosophy as the Phase 1c fundamental
+#       limitations). A real deployment needs a specialist provider (IdealRatings,
+#       Musaffa, Zoya, S&P/AAOIFI-certified feeds) for those.
+#
+# yfinance's totalDebt: interest-bearing short- + long-term debt — the correct
+# basis for the AAOIFI debt screen. Coverage on the S&P 500 universe (Phase 1d)
+# is good; it can be null on ADRs, small caps and non-standard filers, so
+# debt_to_market_cap is returned as None (with a note) rather than guessed.
+# It is a SPOT figure, whereas some boards use a trailing-12/24-month average
+# market cap — a known, documented approximation, not a silent one.
+#
+# Islamic vs conventional banks: the sector/industry feed cannot tell a
+# Shari'ah-compliant Islamic bank apart from a conventional one, so every
+# "Banks"/"Insurance" industry is treated as excluded. Flagged in
+# `unavailable_checks`.
+# ----------------------------------------------------------------------------
+
+_SHARIA_STANDARD = "AAOIFI Shari'ah Standard No. 21"
+
+# AAOIFI debt screen threshold: interest-bearing debt / market cap must be < 33%
+# (per AAOIFI Shari'ah Standard No. 21 as cited in the project reference material;
+# note some other screening boards, e.g. AAOIFI-conservative readings, use 30%).
+_SHARIA_DEBT_TO_MCAP_THRESHOLD = 0.33
+
+# category key -> human-readable label (used to build exclusion_reason)
+_SHARIA_CATEGORY_LABELS = {
+    "conventional_finance": "conventional (interest-based) financials — banking / insurance / lending",
+    "alcohol": "alcohol production or distribution",
+    "tobacco": "tobacco",
+    "gambling": "gambling / casinos",
+    "defense_weapons": "defense / weapons manufacturing",
+}
+
+# EXPLICIT mapping: yfinance `industry` string (lower-cased) -> prohibited category.
+# yfinance uses Yahoo's taxonomy, not raw GICS — the financial `sector` is
+# "Financial Services" and industries look like "Banks - Diversified". Matching is
+# exact (case-insensitive) on the structured `industry` field.
+_SHARIA_PROHIBITED_INDUSTRIES = {
+    # --- conventional financials -------------------------------------------
+    "banks - diversified": "conventional_finance",
+    "banks - regional": "conventional_finance",
+    "banks": "conventional_finance",
+    "mortgage finance": "conventional_finance",
+    "financial - mortgages": "conventional_finance",
+    "credit services": "conventional_finance",
+    "financial - credit services": "conventional_finance",
+    "capital markets": "conventional_finance",
+    "financial - capital markets": "conventional_finance",
+    "financial data & stock exchanges": "conventional_finance",
+    "financial - data & stock exchanges": "conventional_finance",
+    "insurance - diversified": "conventional_finance",
+    "insurance - life": "conventional_finance",
+    "insurance - property & casualty": "conventional_finance",
+    "insurance - reinsurance": "conventional_finance",
+    "insurance - specialty": "conventional_finance",
+    "insurance brokers": "conventional_finance",
+    "financial conglomerates": "conventional_finance",
+    "asset management": "conventional_finance",
+    "shell companies": "conventional_finance",
+    # --- alcohol ----------------------------------------------------------
+    "beverages - brewers": "alcohol",
+    "beverages - wineries & distilleries": "alcohol",
+    # --- tobacco --------------------------------------------------------
+    "tobacco": "tobacco",
+    # --- gambling -------------------------------------------------------
+    "gambling": "gambling",
+    "resorts & casinos": "gambling",
+    # --- defense / weapons --------------------------------------------
+    "aerospace & defense": "defense_weapons",
+}
+
+# Broad safety net: if yfinance puts a name in this `sector` but its specific
+# `industry` string isn't in the map above, still exclude it (conservative — an
+# over-exclusion in a compliance HARD filter is the safe direction). Reason will
+# name the sector rather than the industry.
+_SHARIA_PROHIBITED_SECTORS = {
+    "financial services": "conventional_finance",
+}
+
+# AAOIFI SS-21 criteria we CANNOT compute from yfinance — returned verbatim in
+# the `unavailable_checks` field. Not estimated, not fabricated.
+_SHARIA_UNAVAILABLE_CHECKS = {
+    "impure_income_ratio": "Interest income + other non-compliant revenue as a share of total "
+                           "income (AAOIFI cap: < 5%). Needs a line-item income statement / "
+                           "revenue-source breakdown that yfinance does not provide.",
+    "interest_bearing_investments_ratio": "(Cash + interest-bearing securities) / market cap "
+                                          "(AAOIFI cap: < 30%). yfinance has no split of "
+                                          "interest-bearing vs non-interest-bearing investments.",
+    "illiquid_asset_ratio": "Tangible/illiquid assets as a share of total assets (some boards "
+                            "require >= 30% for share tradability). Not derivable here.",
+    "dividend_purification_amount": "Per-share amount to donate to purify impure income. "
+                                    "Requires impure_income_ratio, which is unavailable.",
+    "subsidiary_lookthrough": "AAOIFI requires assessing non-compliant activities of "
+                              "subsidiaries/associates; structured feeds do not expose this.",
+    "islamic_institution_carveout": "The sector/industry feed cannot distinguish a "
+                                    "Shari'ah-compliant Islamic bank/insurer (takaful) from a "
+                                    "conventional one — all 'Banks' / 'Insurance' industries are "
+                                    "flagged as excluded regardless.",
+}
+
+# Bumped when the meaning/shape of a cached sharia row changes (cache-busting,
+# same mechanism as _FUNDAMENTAL_SCHEMA_VERSION).
+#   1 -> Phase 1g initial shape
+#   2 -> debt screen threshold corrected 0.30 -> 0.33 (changes passes_debt_screen /
+#        overall_compliant / debt_to_market_cap_threshold on cached rows)
+_SHARIA_SCHEMA_VERSION = 2
+
+
 # Dipakai sebagai pengganti "tanpa batas bawah" untuk period="max" (lihat
 # _resolve_lookback_start) — lebih tua dari IPO saham manapun yang realistis
 _EARLIEST_POSSIBLE_DATE = date(1900, 1, 1)
@@ -554,6 +686,247 @@ def get_fundamental_data(ticker: str, as_of_date: Optional[str] = None) -> Dict[
     return result
 
 
+# ============================================================================
+# Phase 1g — Sharia compliance screening (AAOIFI SS-21). See the big block near
+# the top of this module for scope + limitations.
+# ============================================================================
+def _classify_sharia_sector_exclusion(
+    sector: Optional[str], industry: Optional[str]
+) -> Dict[str, Optional[str]]:
+    """
+    Business-activity screen: map the (already-structured) yfinance
+    sector/industry onto the prohibited-category list. Deterministic, explicit,
+    no LLM / no free-text keyword guessing.
+
+    Precedence: specific `industry` match first (more precise reason), then the
+    broad `sector` safety net.
+
+    Returns {"flag": bool, "reason": str | None, "category": str | None}.
+    """
+    industry_norm = (industry or "").strip().lower()
+    sector_norm = (sector or "").strip().lower()
+
+    category = _SHARIA_PROHIBITED_INDUSTRIES.get(industry_norm)
+    if category is not None:
+        label = _SHARIA_CATEGORY_LABELS[category]
+        return {
+            "flag": True,
+            "category": category,
+            "reason": f"{label} (yfinance industry: {industry!r})",
+        }
+
+    category = _SHARIA_PROHIBITED_SECTORS.get(sector_norm)
+    if category is not None:
+        label = _SHARIA_CATEGORY_LABELS[category]
+        return {
+            "flag": True,
+            "category": category,
+            "reason": (
+                f"{label} (yfinance sector: {sector!r}; specific industry "
+                f"{industry!r} not individually listed — sector-level exclusion)"
+            ),
+        }
+
+    return {"flag": False, "category": None, "reason": None}
+
+
+def _sharia_error(ticker: str, error: str, as_of_date: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "ticker": ticker,
+        "success": False,
+        "error": error,
+        "as_of_date": as_of_date,
+        "schema_version": _SHARIA_SCHEMA_VERSION,
+        "standard": _SHARIA_STANDARD,
+        "is_point_in_time": False,
+        "warning": None,
+        "total_debt": None,
+        "market_cap": None,
+        "debt_to_market_cap": None,
+        "debt_to_market_cap_threshold": _SHARIA_DEBT_TO_MCAP_THRESHOLD,
+        "passes_debt_screen": None,
+        "sector": None,
+        "industry": None,
+        "sector_exclusion_flag": None,
+        "excluded_category": None,
+        "exclusion_reason": None,
+        "overall_compliant": None,
+        "unavailable_checks": dict(_SHARIA_UNAVAILABLE_CHECKS),
+    }
+
+
+def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Compute the AAOIFI SS-21 share-screening signals we can derive from
+    yfinance: the interest-bearing-debt / market-cap ratio, and the
+    business-activity (sector/industry) exclusion flag.
+
+    Like fetch_fundamental_data, this is NOT point-in-time — it reads the
+    current yfinance `.info` snapshot (totalDebt, marketCap, sector, industry).
+    When `as_of_date` is set, the result still carries is_point_in_time=False
+    and a `warning`.
+
+    Args:
+        ticker: 股票代码, e.g. "AAPL"
+        as_of_date: None = live; ISO "YYYY-MM-DD" = still the current snapshot,
+            marked is_point_in_time=False.
+
+    Returns:
+        success: {
+            "ticker": str, "success": True, "error": None,
+            "as_of_date": str | None,
+            "schema_version": int,           # _SHARIA_SCHEMA_VERSION, cache-busting
+            "standard": str,                 # "AAOIFI Shari'ah Standard No. 21"
+            "is_point_in_time": False, "warning": str | None,
+
+            "total_debt": int | None,        # yfinance totalDebt (interest-bearing)
+            "market_cap": int | None,
+            "debt_to_market_cap": float | None,   # total_debt / market_cap; DISTINCT
+                                                  #   from fundamental.debt_to_equity
+            "debt_to_market_cap_threshold": 0.33, # AAOIFI cap (SS-21, per project ref)
+            "passes_debt_screen": bool | None,    # ratio < threshold; None if ratio None
+
+            "sector": str | None, "industry": str | None,
+            "sector_exclusion_flag": bool,   # True => prohibited primary business
+            "excluded_category": str | None, # machine key: conventional_finance / alcohol / ...
+            "exclusion_reason": str | None,  # human explanation, or None if not excluded
+
+            "overall_compliant": bool | None,# NOT excluded AND passes_debt_screen;
+                                             #   None if the debt screen is indeterminate.
+                                             #   PARTIAL — see unavailable_checks.
+            "unavailable_checks": {check: reason_it_cannot_be_computed},
+        }
+        failure: {"ticker": str, "success": False, "error": str, ...others None/def}
+    """
+    ticker = (ticker or "").strip().upper()
+    if not ticker:
+        return _sharia_error(ticker, "股票代码不能为空", as_of_date)
+
+    try:
+        info = yf.Ticker(ticker).info
+    except YFException as e:
+        logger.warning(f"获取 {ticker} Sharia 数据失败(yfinance异常): {e}")
+        return _sharia_error(ticker, f"yfinance请求失败: {e}", as_of_date)
+    except Exception as e:
+        logger.warning(f"获取 {ticker} Sharia 数据失败: {e}")
+        return _sharia_error(ticker, f"请求异常: {e}", as_of_date)
+
+    if not info or len(info) <= 1:
+        logger.info(f"股票代码 {ticker} 未返回任何数据，可能是无效代码 (Sharia)")
+        return _sharia_error(
+            ticker, f"未找到股票代码 '{ticker}' 的数据，可能是无效代码或已退市", as_of_date
+        )
+
+    sector = info.get("sector")
+    industry = info.get("industry")
+    total_debt = info.get("totalDebt")
+    market_cap = info.get("marketCap")
+
+    # --- financial-ratio screen: debt / market cap ---
+    debt_to_market_cap: Optional[float] = None
+    if (
+        total_debt is not None and total_debt == total_debt          # not NaN
+        and market_cap is not None and market_cap == market_cap
+        and market_cap > 0
+    ):
+        debt_to_market_cap = round(float(total_debt) / float(market_cap), 6)
+    passes_debt_screen: Optional[bool] = (
+        None if debt_to_market_cap is None
+        else debt_to_market_cap < _SHARIA_DEBT_TO_MCAP_THRESHOLD
+    )
+
+    # --- business-activity screen: sector/industry exclusion ---
+    exclusion = _classify_sharia_sector_exclusion(sector, industry)
+
+    # --- overall (PARTIAL — only the checks we can actually run) ---
+    if exclusion["flag"]:
+        overall_compliant: Optional[bool] = False
+    elif passes_debt_screen is None:
+        overall_compliant = None            # can't confirm without the debt ratio
+    else:
+        overall_compliant = bool(passes_debt_screen)
+
+    warning = (
+        "Sharia screening signals are derived from the CURRENT yfinance snapshot "
+        "(totalDebt / marketCap / sector), not a point-in-time record"
+    )
+    if as_of_date is not None:
+        warning += f"; as_of_date={as_of_date} is a label only, the data is today's"
+    warning += ". PARTIAL: only the debt and business-activity screens are run — "
+    warning += "see unavailable_checks for AAOIFI criteria not computed."
+
+    unavailable = dict(_SHARIA_UNAVAILABLE_CHECKS)
+    if debt_to_market_cap is None:
+        unavailable["debt_to_market_cap"] = (
+            f"yfinance returned totalDebt={total_debt!r} / marketCap={market_cap!r}; "
+            f"the debt screen could not be computed for this ticker."
+        )
+    if not sector and not industry:
+        unavailable["business_activity_screen"] = (
+            "yfinance returned no sector/industry for this ticker; the exclusion "
+            "flag defaults to False but the primary business could not be verified."
+        )
+
+    return {
+        "ticker": ticker,
+        "success": True,
+        "error": None,
+        "as_of_date": as_of_date,
+        "schema_version": _SHARIA_SCHEMA_VERSION,
+        "standard": _SHARIA_STANDARD,
+        "is_point_in_time": False,
+        "warning": warning,
+        "total_debt": total_debt if (total_debt == total_debt) else None,
+        "market_cap": market_cap if (market_cap == market_cap) else None,
+        "debt_to_market_cap": debt_to_market_cap,
+        "debt_to_market_cap_threshold": _SHARIA_DEBT_TO_MCAP_THRESHOLD,
+        "passes_debt_screen": passes_debt_screen,
+        "sector": sector,
+        "industry": industry,
+        "sector_exclusion_flag": exclusion["flag"],
+        "excluded_category": exclusion["category"],
+        "exclusion_reason": exclusion["reason"],
+        "overall_compliant": overall_compliant,
+        "unavailable_checks": unavailable,
+    }
+
+
+def get_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Cached wrapper around fetch_sharia_compliance_data (recommended entry point).
+
+    Cache strategy is identical to get_fundamental_data: keyed on
+    (ticker, as_of_date, data_type="sharia"), historical snapshots never expire,
+    and a cached row whose schema_version != _SHARIA_SCHEMA_VERSION is treated
+    as a miss and refetched.
+
+    Filling as_of_date does NOT make the data point-in-time (see
+    fetch_sharia_compliance_data / the module-level note) — the row cached under
+    a historical key is the snapshot at first-call time, marked
+    is_point_in_time=False.
+    """
+    ticker = (ticker or "").strip().upper()
+
+    cached = get_cached(ticker, "sharia", as_of_date)
+    if cached is not None and cached.get("schema_version") == _SHARIA_SCHEMA_VERSION:
+        logger.info(f"Cache hit for {ticker}/sharia" + (f"@{as_of_date}" if as_of_date else " (live)"))
+        return cached
+    if cached is not None:
+        logger.info(
+            f"Cache hit but stale schema "
+            f"(cached v{cached.get('schema_version')!r} != v{_SHARIA_SCHEMA_VERSION}), "
+            f"refetching: {ticker}/sharia" + (f"@{as_of_date}" if as_of_date else " (live)")
+        )
+
+    logger.info(f"Cache miss, fetching from yfinance: {ticker}/sharia" + (f"@{as_of_date}" if as_of_date else " (live)"))
+    result = fetch_sharia_compliance_data(ticker, as_of_date=as_of_date)
+
+    if result.get("success"):
+        set_cache(ticker, "sharia", result, as_of_date)
+
+    return result
+
+
 def get_stock_context(ticker: str, as_of_date: Optional[str] = None) -> Dict[str, Any]:
     """
     Menggabungkan data harga + fundamental satu saham menjadi satu dict
@@ -570,6 +943,8 @@ def get_stock_context(ticker: str, as_of_date: Optional[str] = None) -> Dict[str
               fundamental["is_point_in_time"] dan fundamental["warning"]
               sebelum memakainya untuk backtest historis (lihat catatan
               besar di docstring modul ini).
+            - Bagian "sharia_compliance" (Phase 1g) juga TIDAK point-in-time —
+              turunan dari totalDebt / marketCap / sector yfinance terkini.
 
     Returns:
         {
@@ -580,13 +955,17 @@ def get_stock_context(ticker: str, as_of_date: Optional[str] = None) -> Dict[str
                                          #   daftar S&P 500 Phase 1d.
             "as_of_date": str,  # nilai as_of_date apa adanya, atau "live" jika None
             "success": bool,    # True hanya jika price DAN fundamental sama-sama sukses
+                                #   (sharia_compliance TIDAK ikut menentukan ini — ia
+                                #   punya "success" sendiri, seperti sub-dict lain)
             "price": <hasil get_price_data(...)>,
             "fundamental": <hasil get_fundamental_data(...)>,
+            "sharia_compliance": <hasil get_sharia_compliance_data(...)>,  # Phase 1g
         }
     """
     ticker = (ticker or "").strip().upper()
     price = get_price_data(ticker, as_of_date=as_of_date)
     fundamental = get_fundamental_data(ticker, as_of_date=as_of_date)
+    sharia_compliance = get_sharia_compliance_data(ticker, as_of_date=as_of_date)
 
     return {
         "ticker": ticker,
@@ -595,6 +974,7 @@ def get_stock_context(ticker: str, as_of_date: Optional[str] = None) -> Dict[str
         "success": bool(price.get("success")) and bool(fundamental.get("success")),
         "price": price,
         "fundamental": fundamental,
+        "sharia_compliance": sharia_compliance,
     }
 
 
@@ -1023,3 +1403,74 @@ if __name__ == "__main__":
         "stored debt_to_equity is not yfinance debtToEquity / 100"
     print(f"\nPASS: company_name + 4 new fundamental fields present, PEG skipped, "
           f"debt_to_equity normalized to a ratio, all carry is_point_in_time=False.")
+
+    # --- Phase 1g: Sharia compliance screening — AAPL vs JPM side by side ---
+    print(f"\n{'=' * 60}\nPhase 1g: sharia_compliance (AAOIFI SS-21)\n{'=' * 60}")
+    print(f"  debt screen threshold: debt_to_market_cap < "
+          f"{_SHARIA_DEBT_TO_MCAP_THRESHOLD} (corrected 0.30 -> 0.33 per project ref)")
+
+    def _show_sharia(sym: str) -> Dict[str, Any]:
+        ctx = get_stock_context(sym, as_of_date=AS_OF)
+        sc = ctx["sharia_compliance"]
+        print(f"\n  ---- {sym}  (get_stock_context('{sym}', as_of_date='{AS_OF}')['sharia_compliance']) ----")
+        print(f"    success                       : {sc['success']}")
+        print(f"    standard                      : {sc['standard']}")
+        print(f"    sector / industry             : {sc['sector']!r} / {sc['industry']!r}")
+        print(f"    total_debt                    : {sc['total_debt']!r}")
+        print(f"    market_cap                    : {sc['market_cap']!r}")
+        print(f"    debt_to_market_cap            : {sc['debt_to_market_cap']!r}  "
+              f"(threshold {sc['debt_to_market_cap_threshold']}, distinct from "
+              f"fundamental.debt_to_equity={ctx['fundamental'].get('debt_to_equity')!r})")
+        print(f"    passes_debt_screen            : {sc['passes_debt_screen']!r}")
+        print(f"    sector_exclusion_flag         : {sc['sector_exclusion_flag']!r}")
+        print(f"    excluded_category             : {sc['excluded_category']!r}")
+        print(f"    exclusion_reason              : {sc['exclusion_reason']!r}")
+        print(f"    overall_compliant (PARTIAL)   : {sc['overall_compliant']!r}")
+        print(f"    is_point_in_time              : {sc['is_point_in_time']!r}")
+        print(f"    warning                       : {sc['warning']}")
+        print(f"    unavailable_checks            :")
+        for name, reason in sc["unavailable_checks"].items():
+            print(f"        - {name}: {reason}")
+        return sc
+
+    sc_aapl = _show_sharia("AAPL")
+    sc_jpm = _show_sharia("JPM")
+    # H (Hyatt Hotels) — live debt_to_market_cap has historically sat right around
+    # 0.30-0.31: a real borderline case that FAILS the old <0.30 rule but PASSES
+    # the corrected <0.33 rule. Not sector-excluded (Lodging).
+    sc_h = _show_sharia("H")
+
+    print(f"\n  {'':24}{'AAPL':>16}{'JPM':>26}{'H (borderline)':>26}")
+    for key in ("sector", "sector_exclusion_flag", "excluded_category",
+                "debt_to_market_cap", "passes_debt_screen", "overall_compliant"):
+        print(f"  {key:24}{str(sc_aapl[key]):>16}{str(sc_jpm[key]):>26}{str(sc_h[key]):>26}")
+
+    assert sc_aapl["sector_exclusion_flag"] is False, \
+        "AAPL (Technology) must NOT be sector-excluded"
+    assert sc_aapl["excluded_category"] is None and sc_aapl["exclusion_reason"] is None
+    assert sc_aapl["passes_debt_screen"] is True and sc_aapl["overall_compliant"] is True
+    assert sc_jpm["sector_exclusion_flag"] is True, \
+        "JPM (conventional bank) MUST be sector-excluded"
+    assert sc_jpm["excluded_category"] == "conventional_finance", \
+        f"JPM should be excluded as conventional_finance, got {sc_jpm['excluded_category']!r}"
+    assert "bank" in (sc_jpm["exclusion_reason"] or "").lower() \
+        or "financ" in (sc_jpm["exclusion_reason"] or "").lower()
+    assert sc_jpm["overall_compliant"] is False
+    assert sc_aapl["is_point_in_time"] is False and sc_jpm["is_point_in_time"] is False
+
+    # threshold sanity + borderline behaviour
+    assert sc_aapl["debt_to_market_cap_threshold"] == 0.33
+    if sc_h["debt_to_market_cap"] is not None:
+        expected_h = sc_h["debt_to_market_cap"] < 0.33
+        assert sc_h["passes_debt_screen"] is expected_h
+        assert sc_h["sector_exclusion_flag"] is False
+        assert sc_h["overall_compliant"] is expected_h
+        old_rule = sc_h["debt_to_market_cap"] < 0.30
+        note = ("SAME under both thresholds"
+                if old_rule == expected_h
+                else f"DIFFERS: old<0.30 -> {old_rule}, corrected<0.33 -> {expected_h}")
+        print(f"\n  H debt_to_market_cap = {sc_h['debt_to_market_cap']}  ({note})")
+
+    print(f"\nPASS: sector exclusion discriminates AAPL (allowed) vs JPM "
+          f"(excluded: {sc_jpm['excluded_category']}); debt screen uses <0.33; "
+          f"both is_point_in_time=False.")
