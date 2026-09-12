@@ -1,5 +1,6 @@
 """
-Phase 6a — tests for `PortfolioAgent` (Q&A over a computed portfolio dict).
+Phase 6a/6b — tests for `PortfolioAgent` (Q&A + on-demand debate over a
+computed portfolio dict).
 
 Uses the SAME 9-ticker example as Phase 5b / 5e
 (AAPL/MSFT/NVDA/JPM/GS/KO/XOM/WMT/PFE), where JPM & GS are filtered out as
@@ -7,18 +8,26 @@ non-compliant (conventional finance) and PFE is dominated -> ~0 weight.
 
 Offline (pytest): `seed_builder.get_stock_context` + `portfolio_optimizer.get_price_data`
 are patched with the Phase 5b / 5e fixtures, exactly as `test_portfolio_optimizer`
-does, and `build_portfolio()` is run once to produce a real portfolio dict. The
-deterministic fact-extraction path and the no-LLM "not found" path are asserted
-directly. `PortfolioAgent.answer()`'s LLM phrasing step is exercised with a
-capture stub.
+does, and `build_portfolio()` is run once to produce a real portfolio dict.
+
+Phase 6a coverage: the deterministic fact-extraction path and the no-LLM "not
+found" path are asserted directly; `PortfolioAgent.answer()`'s LLM phrasing
+step is exercised with a capture stub.
+
+Phase 6b coverage: `get_debate()` wired to a real portfolio ticker (MSFT,
+`use_llm=False` for an offline/deterministic run), its not-found handling, and
+— the core separation guarantee — that neither a debate-shaped question nor a
+normal fact question ever calls `run_debate()` from inside `answer()`.
 
 Live LLM transcript: `cd backend && python tests/test_portfolio_agent.py`
 (needs LLM_API_KEY / LLM_BASE_URL / LLM_MODEL_NAME, same as the other phases'
-manual prints). Builds the portfolio from the offline fixtures, then asks the
-real model each question and prints the Q&A transcript.
+manual prints). Builds the portfolio from the offline fixtures, asks the real
+model each Q&A question, demonstrates the debate-intent routing message, then
+runs a real 3-round MSFT debate via `get_debate()` and prints the transcript.
 """
 
 import copy
+import re
 
 import pytest
 
@@ -276,6 +285,83 @@ def test_answer_raises_wrapped_on_llm_failure(portfolio):
 
 
 # =========================================================================== #
+# Phase 6b — get_debate(): the separate, explicit, expensive debate path
+# =========================================================================== #
+def test_get_debate_runs_on_a_real_portfolio_ticker(portfolio):
+    """get_debate() wires Phase 4's debate room to a ticker actually IN the
+    portfolio, reusing the portfolio's own as_of_date (never passed separately).
+    use_llm=False keeps this test offline/deterministic."""
+    agent = PortfolioAgent()
+    transcript = agent.get_debate("MSFT", portfolio, rounds=3, use_llm=False)
+
+    assert transcript.ticker == "MSFT"
+    assert transcript.as_of_date == portfolio["as_of_date"] == _AS_OF
+    assert transcript.rounds == 3
+    assert len(transcript.statements) == 3
+    assert len(transcript.round_statements(1)) == 6          # 5 investors + Gamma
+    assert transcript.gamma_verdicts() == ["compliant"] * 3  # MSFT is compliant
+    # every statement is grounded in a real figure, per Phase 4's own guarantee
+    assert all(re.search(r"\d", s.text) for s in transcript.flat())
+
+
+def test_get_debate_ticker_not_in_portfolio_raises_clearly(portfolio):
+    agent = PortfolioAgent()
+    with pytest.raises(PortfolioAgentError) as ei:
+        agent.get_debate("NOPE", portfolio, use_llm=False)
+    msg = str(ei.value)
+    assert "NOPE" in msg
+    assert "does not appear anywhere" in msg or "cannot debate" in msg
+    assert "MSFT" in msg                      # lists the tickers it CAN debate
+
+
+def test_get_debate_lowercases_and_strips_ticker(portfolio):
+    agent = PortfolioAgent()
+    t = agent.get_debate("  msft  ", portfolio, rounds=1, use_llm=False)
+    assert t.ticker == "MSFT"
+
+
+# --------------------------------------------------------------------------- #
+# The cheap and expensive paths never cross
+# --------------------------------------------------------------------------- #
+def test_debate_intent_is_routed_without_running_a_debate(portfolio, monkeypatch):
+    """A debate-shaped question must be routed to get_debate() by NAME, not by
+    actually running one — and must not touch the LLM either (the routing
+    decision itself is a cheap keyword check)."""
+    monkeypatch.setattr(
+        "app.services.portfolio_agent.run_debate",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("run_debate must not run")),
+    )
+    llm = _CaptureLLM()
+    agent = PortfolioAgent(llm_client=llm)
+
+    out = agent.answer("Can you show me the debate for MSFT?", portfolio)
+    assert "get_debate" in out and "MSFT" in out
+    assert llm.calls == []                    # no LLM call for the routing decision
+
+
+def test_normal_question_never_triggers_run_debate(portfolio, monkeypatch):
+    """The core separation guarantee: an ordinary fact question about the same
+    ticker a debate could be run on must never invoke run_debate()."""
+    monkeypatch.setattr(
+        "app.services.portfolio_agent.run_debate",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("run_debate must not run")),
+    )
+    llm = _CaptureLLM(reply="MSFT sits at the 20% cap.")
+    agent = PortfolioAgent(llm_client=llm)
+
+    out = agent.answer("why is MSFT 20%?", portfolio)
+    assert out == "MSFT sits at the 20% cap."
+    assert len(llm.calls) == 1                # the cheap path DID use the LLM to phrase
+
+
+def test_debate_intent_with_unresolved_ticker_routes_without_guessing(portfolio):
+    agent = PortfolioAgent(llm_client=_CaptureLLM())
+    out = agent.answer("Let's discuss the portfolio.", portfolio)
+    assert "get_debate" in out
+    assert "can't tell which ticker" in out
+
+
+# =========================================================================== #
 # Manual live-LLM transcript
 # =========================================================================== #
 if __name__ == "__main__":
@@ -285,6 +371,7 @@ if __name__ == "__main__":
 
     import app.services.portfolio_optimizer as _po
     import app.services.seed_builder as _sb
+    from app.services.portfolio_agent import _wants_debate
 
     _orig_ctx, _orig_price = _sb.get_stock_context, _po.get_price_data
     _sb.get_stock_context = lambda ticker, as_of_date=None: copy.deepcopy(_CONTEXTS[ticker.strip().upper()])
@@ -317,6 +404,7 @@ if __name__ == "__main__":
         "Why is PFE in the portfolio but at essentially zero weight?",
         "What are the portfolio's expected return, volatility and Sharpe ratio?",
         "Why is BOGUS not in the portfolio?",
+        "Can you show me the full debate for MSFT?",   # Phase 6b: must NOT run a debate here
     ]
 
     agent = PortfolioAgent()
@@ -333,9 +421,43 @@ if __name__ == "__main__":
         facts = agent.extract_facts(q, pf)
         print("\n-- derived facts (subject) --")
         print(json.dumps(facts["subject"], indent=2, default=str, ensure_ascii=False))
-        if facts["subject"].get("kind") == "not_found" or llm_ready:
+        # debate-routing and not-found are deterministic (no LLM) -> always printable
+        if facts["subject"].get("kind") == "not_found" or _wants_debate(q) or llm_ready:
             print("\n-- ANSWER --")
             try:
                 print(agent.answer(q, pf))
             except Exception as exc:  # noqa: BLE001
                 print(f"[answer failed: {exc}]")
+
+    # ----------------------------------------------------------------------- #
+    # Phase 6b — get_debate(): the separate, explicit, expensive debate path.
+    # Q7 above proved answer() ROUTES to this instead of running it; here we
+    # actually call it, on purpose, exactly as a caller would after that route.
+    # ----------------------------------------------------------------------- #
+    print("\n\n" + "=" * 94)
+    print(f"PHASE 6b — agent.get_debate('MSFT', pf)  (explicit call, separate from answer())")
+    print("=" * 94)
+    transcript = agent.get_debate("MSFT", pf, rounds=3, use_llm=llm_ready)
+    if not llm_ready:
+        print("[!] LLM_API_KEY not set — running with use_llm=False (deterministic templates).\n")
+
+    print(f"Gamma verdict (derived ONCE, frozen for every round): "
+          f"{transcript.gamma_verdict['verdict'].upper()} — {transcript.gamma_verdict['rationale']}")
+    for r in range(1, transcript.rounds + 1):
+        print("\n" + "#" * 94)
+        print(f"# ROUND {r}")
+        print("#" * 94)
+        for s in transcript.round_statements(r):
+            tag = f"{s.persona_name}  [{s.role}: {s.disposition}]"
+            print(f"\n  {tag}\n  {'-' * len(tag)}")
+            print(f"  {s.text}")
+    print(f"\nGamma verdict every round: {transcript.gamma_verdicts()}  "
+          f"(identical: {len(set(transcript.gamma_verdicts())) == 1})")
+
+    # not-found path for get_debate() itself
+    print("\n" + "-" * 94)
+    try:
+        agent.get_debate("BOGUS", pf, use_llm=False)
+        print("[!] expected get_debate('BOGUS', ...) to raise — it did not")
+    except Exception as exc:  # noqa: BLE001
+        print(f"get_debate('BOGUS', pf) raised as expected: {exc}")

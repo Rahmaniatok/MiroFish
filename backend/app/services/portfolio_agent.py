@@ -32,6 +32,24 @@ carries over.
 
 Placement: `app/services/`, alongside `portfolio_optimizer` / `consensus_screener`
 — this orchestrates on top of the Phase 5 output, it is not data-layer logic.
+
+Phase 6b adds `get_debate()`: an explicit, separate, expensive escape hatch to
+Phase 4's multi-round debate room for ONE ticker, on demand. Design decision
+(confirmed before implementing): debate is presentation-only narrative, never
+required for the allocation decision itself, so it must never run implicitly.
+Concretely that means two guarantees, both enforced here rather than just
+documented:
+  1. `answer()` NEVER calls `run_debate()`. A question that reads as "show me
+     the debate" is recognized by a cheap, deterministic keyword check
+     (`_wants_debate`) and routed to a plain string telling the caller to call
+     `get_debate()` themselves — no LLM call decides this, and no debate runs
+     on that path.
+  2. `get_debate(ticker, portfolio, ...)` is a distinct public method a caller
+     must invoke on purpose. It reuses Phase 6a's ticker classification
+     (`_subject_facts`) so "ticker not in this portfolio" behaves identically
+     to `answer()`, and reuses the portfolio's own `as_of_date` so the debate
+     can never drift to a different point in time than the portfolio it is
+     explaining.
 """
 
 import json
@@ -40,8 +58,24 @@ from statistics import fmean
 from typing import Any, Dict, List, Optional
 
 from ..utils.logger import get_logger
+from .debate_room import DEFAULT_DEBATE_ROUNDS, DebateTranscript, run_debate
+from .seed_builder import build_seed_from_ticker
 
 logger = get_logger("mirofish.portfolio_agent")
+
+# Cheap, deterministic signal that a question wants the FULL multi-round agent
+# debate rather than a quick fact lookup. Substring match on the lower-cased
+# question — no LLM call decides this, so a wrong route never burns a debate.
+_DEBATE_INTENT_KEYWORDS = (
+    "debate", "discuss", "discussion", "deliberat", "argue", "argument",
+    "back and forth", "round by round", "round-by-round", "full transcript",
+    "what did the agents", "what did the investors", "what did the personas",
+)
+
+
+def _wants_debate(question: str) -> bool:
+    q = (question or "").lower()
+    return any(kw in q for kw in _DEBATE_INTENT_KEYWORDS)
 
 # A weight at or below this is a true zero (the optimizer leaves dust; Phase 5e
 # already filters `weights` to |w| > 1e-5, but `holdings[].weight` can be 0.0).
@@ -266,9 +300,13 @@ def _subject_facts(ticker_info: Dict[str, Any], portfolio: Dict[str, Any]) -> Di
 class PortfolioAgent:
     """Answers natural-language questions about a Phase 5e portfolio dict.
 
-    The agent is read-only: it never calls `screen_and_rank`, `optimize_portfolio`
-    or `build_portfolio`. It extracts facts from the dict deterministically and
-    uses an LLM only to phrase the answer.
+    Two clearly separate API-level paths:
+      - `answer()` — CHEAP. Read-only: never calls `screen_and_rank`,
+        `optimize_portfolio`, `build_portfolio`, or `run_debate`. Extracts
+        facts from the dict deterministically and uses an LLM only to phrase
+        the answer (or a fixed string for "not found" / debate-routing).
+      - `get_debate()` — EXPENSIVE. A distinct, explicit call that runs a fresh
+        Phase 4 multi-round debate for one ticker. Never invoked by `answer()`.
     """
 
     def __init__(
@@ -365,12 +403,19 @@ class PortfolioAgent:
         """Answer `question` grounded in `portfolio` (a Phase 5e `build_portfolio`
         dict).
 
-        A question about a ticker that appears nowhere in the dict returns a
-        deterministic "not found" message with no LLM call. Everything else
-        extracts facts deterministically, then asks the LLM to phrase them.
+        This is the CHEAP path and never runs a debate: a question that reads as
+        a request for the full multi-round agent debate is routed to a plain
+        string pointing at `get_debate()` (see `_wants_debate` — a keyword
+        check, not an LLM call). A question about a ticker that appears nowhere
+        in the dict returns a deterministic "not found" message with no LLM
+        call. Everything else extracts facts deterministically, then asks the
+        LLM to phrase them.
         """
         facts = self.extract_facts(question, portfolio)
         subject = facts["subject"]
+
+        if _wants_debate(question):
+            return self._debate_routing_message(subject, facts)
 
         if subject.get("kind") == "not_found":
             return self._not_found_answer(subject["ticker"], facts)
@@ -389,7 +434,89 @@ class PortfolioAgent:
         ]
         return self._phrase_with_llm(messages)
 
+    def get_debate(
+        self,
+        ticker: str,
+        portfolio: Dict[str, Any],
+        rounds: int = DEFAULT_DEBATE_ROUNDS,
+        *,
+        use_llm: bool = True,
+    ) -> DebateTranscript:
+        """Run a FRESH Phase 4 multi-round debate for `ticker` on demand.
+
+        This is the EXPENSIVE, explicit path (a multi-round LLM call per
+        persona) — it is a distinct public method a caller must invoke on
+        purpose, and `answer()` never calls it. Use it only after the caller
+        has actually decided they want the debate (e.g. `answer()` routed them
+        here via `_wants_debate`, or they asked for it directly).
+
+        Args:
+            ticker: any ticker present anywhere in `portfolio` — a holding,
+                compliance-excluded, dropped-from-optimization, or skipped.
+                Reuses Phase 6a's `_subject_facts` classification, so a ticker
+                absent from the portfolio fails exactly like `answer()` would
+                report it: clearly, and without guessing.
+            portfolio: the Phase 5e `build_portfolio()` dict. Its `as_of_date`
+                is reused for the seed build so the debate is guaranteed to be
+                about the same point in time the portfolio was computed for —
+                the caller cannot pass a different date by mistake because
+                there is nowhere to pass one.
+            rounds: debate rounds (default `debate_room.DEFAULT_DEBATE_ROUNDS`).
+            use_llm: forwarded to `run_debate` (False = deterministic offline
+                templates; used by tests, real callers want the default True).
+
+        Returns:
+            The full `DebateTranscript` (5 investors + Gamma, `rounds` rounds).
+
+        Raises:
+            PortfolioAgentError: `ticker` does not appear anywhere in
+                `portfolio` (not a holding, not compliance-excluded, not
+                skipped) — no seed is built and no debate is run.
+        """
+        ticker_norm = (ticker or "").strip().upper()
+        subject = _subject_facts({"ticker": ticker_norm}, portfolio)
+        if subject["kind"] == "not_found":
+            known = _known_tickers(portfolio)
+            raise PortfolioAgentError(
+                f"cannot debate {ticker_norm!r}: it does not appear anywhere in "
+                f"this portfolio result (not a holding, not compliance-excluded, "
+                f"not skipped). Tickers available: "
+                f"{', '.join(known) if known else 'none'}."
+            )
+
+        as_of_date = portfolio.get("as_of_date")
+        seed = build_seed_from_ticker(ticker_norm, as_of_date)
+        return run_debate(seed, rounds=rounds, use_llm=use_llm, model_name=self._model_name)
+
     # -- internals ------------------------------------------------------- #
+    @staticmethod
+    def _debate_routing_message(subject: Dict[str, Any], facts: Dict[str, Any]) -> str:
+        """Deterministic (no LLM) routing reply for a debate-shaped question."""
+        known = facts["known_tickers"]
+        known_str = ", ".join(known) if known else "none"
+        kind = subject.get("kind")
+        ticker = subject.get("ticker")
+
+        if kind in (None, "portfolio_level"):
+            return (
+                "That reads like a request for the full multi-round agent debate, "
+                "not a quick fact lookup, but I can't tell which ticker you mean. "
+                f"Call PortfolioAgent.get_debate(ticker, portfolio) with one of the "
+                f"tickers in this portfolio: {known_str}."
+            )
+        if kind == "not_found":
+            return (
+                f"{ticker} does not appear anywhere in this portfolio result, so "
+                f"there is no debate to run for it. Tickers available: {known_str}."
+            )
+        return (
+            f"That's a request for the full 5-investor + Gamma debate transcript "
+            f"on {ticker}, not a quick fact lookup. Call "
+            f"PortfolioAgent.get_debate({ticker!r}, portfolio) to run it — that "
+            f"triggers a fresh multi-round LLM debate and is intentionally kept "
+            f"separate from this cheap Q&A path."
+        )
+
     @staticmethod
     def _not_found_answer(ticker: str, facts: Dict[str, Any]) -> str:
         known = facts["known_tickers"]
