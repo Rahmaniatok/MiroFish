@@ -28,7 +28,7 @@ from skfolio.prior import EmpiricalPrior
 
 from ..data_layer.market_data import fetch_price_data, get_price_data
 from ..utils.logger import get_logger
-from .consensus_screener import screen_and_rank
+from .consensus_screener import _run_consensus_screen
 
 logger = get_logger("mirofish.portfolio")
 
@@ -339,9 +339,28 @@ def build_portfolio(
           }, ...
         ],
         "dropped_from_optimization": [{"ticker", "reason"}, ...],
+        "screening": {                         # what the Phase 5b screen removed BEFORE optimization
+          "excluded_non_compliant": [         # failed the Sharia-compliance hard filter
+            {
+              "ticker": str,
+              "consensus_score": float,       # the score it WOULD have ranked on (filter, not sort)
+              "per_archetype_scores": {key: float, ...},
+              "per_archetype_stances": {key: str, ...},
+              "compliance_verdict": str,      # non_compliant / indeterminate / unknown
+              "compliance_reason": str,       # Gamma's rationale, VERBATIM
+              "passes_compliance": bool,      # always False here
+            }, ...
+          ],
+          "skipped": [{"ticker", "reason"}, ...],   # could not be scored at all (no data, bad symbol)
+        },
       }
+
+    The `screening` block is what lets a downstream reader (Phase 6a's
+    `PortfolioAgent`) explain "why is JPM not in the portfolio?" - JPM is absent
+    from `holdings`/`weights` entirely, and only this block records why.
     """
-    ranked = screen_and_rank(candidate_tickers, as_of_date=as_of_date, top_k=top_k)
+    screen = _run_consensus_screen(candidate_tickers, as_of_date, top_k)
+    ranked = screen["ranked"]
     ranked_tickers = [r["ticker"] for r in ranked]
 
     opt = optimize_portfolio(
@@ -386,6 +405,21 @@ def build_portfolio(
         },
         "holdings": holdings,
         "dropped_from_optimization": opt["dropped"],
+        "screening": {
+            "excluded_non_compliant": [
+                {
+                    "ticker": e["ticker"],
+                    "consensus_score": e["consensus_score"],
+                    "per_archetype_scores": e["per_archetype_scores"],
+                    "per_archetype_stances": e["per_archetype_stances"],
+                    "compliance_verdict": e["compliance_verdict"],
+                    "compliance_reason": e["compliance_reason"],
+                    "passes_compliance": e["passes_compliance"],
+                }
+                for e in screen["excluded_non_compliant"]
+            ],
+            "skipped": [dict(s) for s in screen["skipped"]],
+        },
     }
 
 
@@ -422,3 +456,10 @@ if __name__ == "__main__":
         print("\n  dropped from optimization:")
         for d in result["dropped_from_optimization"]:
             print(f"    {d['ticker']:<7} {d['reason']}")
+
+    excluded = result["screening"]["excluded_non_compliant"]
+    if excluded:
+        print("\n  excluded by the compliance hard filter (never optimized):")
+        for e in excluded:
+            print(f"    {e['ticker']:<7} verdict={e['compliance_verdict']:<14} "
+                  f"consensus={e['consensus_score']:+.3f}  reason: {e['compliance_reason']}")

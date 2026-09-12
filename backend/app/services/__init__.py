@@ -21,6 +21,7 @@ from .portfolio_optimizer import (
     optimize_portfolio,
     build_portfolio,
 )
+from .portfolio_agent import PortfolioAgent, PortfolioAgentError
 from .debate_room import (
     DebateRoom,
     DebateTranscript,
@@ -81,6 +82,8 @@ __all__ = [
     'build_returns_matrix',
     'optimize_portfolio',
     'build_portfolio',
+    'PortfolioAgent',
+    'PortfolioAgentError',
     'DebateRoom',
     'DebateTranscript',
     'DebateStatement',

@@ -254,17 +254,17 @@ def test_build_portfolio_consensus_not_in_optimization_math(patched, monkeypatch
     optimized weights must be byte-identical (scores don't touch the math)."""
     base = build_portfolio(_CANDIDATES, as_of_date="2024-06-01", max_weight=_MAX_WEIGHT)
 
-    real_screen = portfolio_optimizer.screen_and_rank
+    real_screen = portfolio_optimizer._run_consensus_screen
 
     def _shuffled_scores(*args, **kwargs):
-        rows = real_screen(*args, **kwargs)
-        for i, r in enumerate(rows):
+        out = real_screen(*args, **kwargs)
+        for i, r in enumerate(out["ranked"]):
             r = dict(r)
             r["consensus_score"] = (-1.0) ** i * 0.99   # nonsense, but still compliant
-            rows[i] = r
-        return rows
+            out["ranked"][i] = r
+        return out
 
-    monkeypatch.setattr(portfolio_optimizer, "screen_and_rank", _shuffled_scores)
+    monkeypatch.setattr(portfolio_optimizer, "_run_consensus_screen", _shuffled_scores)
     perturbed = build_portfolio(_CANDIDATES, as_of_date="2024-06-01", max_weight=_MAX_WEIGHT)
 
     assert perturbed["weights"] == base["weights"]
