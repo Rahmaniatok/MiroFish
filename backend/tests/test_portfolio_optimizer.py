@@ -269,3 +269,91 @@ def test_build_portfolio_consensus_not_in_optimization_math(patched, monkeypatch
 
     assert perturbed["weights"] == base["weights"]
     assert perturbed["portfolio"]["sharpe_ratio"] == base["portfolio"]["sharpe_ratio"]
+
+
+# --------------------------------------------------------------------------- #
+# Phase 5f — model selector (max_sharpe / min_variance / hrp)
+# --------------------------------------------------------------------------- #
+def test_optimize_portfolio_rejects_unknown_model(patched):
+    with pytest.raises(ValueError, match="model must be one of"):
+        optimize_portfolio(["AAPL", "MSFT", "KO"], as_of_date="2024-06-01", model="not_a_real_model")
+
+
+def test_optimize_portfolio_hrp_has_no_budget_or_objective_function(patched):
+    """HRP is structurally different from MeanRisk (no objective_function/budget)
+    but still respects max_weight and still sums to ~1 (full investment is
+    structural, not a `budget=` toggle)."""
+    seven = ["AAPL", "MSFT", "NVDA", "KO", "XOM", "WMT", "PFE"]
+    out = optimize_portfolio(seven, as_of_date="2024-06-01", max_weight=_MAX_WEIGHT, model="hrp")
+
+    w = out["weights"]
+    assert abs(sum(w.values()) - 1.0) < 1e-4
+    assert all(0 <= v <= _MAX_WEIGHT + 1e-6 for v in w.values())
+    assert out["model"] == "hrp"
+    assert out["objective"].startswith("HRP_")
+
+
+def test_optimize_portfolio_hrp_infeasible_cap_raises_skfolios_own_error(patched):
+    """HRP enforces the identical `n_assets * max_weight < 1` condition itself
+    (verified directly against skfolio during Phase 5f investigation) - the
+    manual guard is skipped for this model, so this must still be a ValueError,
+    just with skfolio's own wording rather than ours."""
+    with pytest.raises(ValueError, match=r"max_weights.*sum is.*must be at least 1\.0"):
+        optimize_portfolio(["AAPL", "MSFT", "KO"], as_of_date="2024-06-01", max_weight=0.20, model="hrp")
+
+
+def test_build_portfolio_three_models_produce_different_allocations(patched, capsys):
+    """Headline Phase 5f test: run build_portfolio() on the same 9-ticker set
+    once per model and print a side-by-side comparison. If two models land on
+    byte-identical weights that's a wiring bug (e.g. `model=` silently
+    ignored), not something to shrug off - assert they differ."""
+    results = {
+        model: build_portfolio(_CANDIDATES, as_of_date="2024-06-01", top_k=25, max_weight=_MAX_WEIGHT, model=model)
+        for model in ("max_sharpe", "min_variance", "hrp")
+    }
+
+    with capsys.disabled():
+        print("\n\n" + "=" * 100)
+        print(f"Phase 5f — build_portfolio() model comparison ({len(_CANDIDATES)} candidates) @ 2024-06-01")
+        print(f"  candidates: {_CANDIDATES}  (JPM/GS excluded as non-compliant in every model)")
+        print("=" * 100)
+
+        all_tickers = sorted({t for r in results.values() for t in r["weights"]})
+        header = f"  {'TICKER':<7}" + "".join(f"{m.upper():>16}" for m in results)
+        print("\n" + header)
+        print("  " + "-" * (7 + 16 * len(results)))
+        for t in all_tickers:
+            row = f"  {t:<7}" + "".join(f"{results[m]['weights'].get(t, 0.0) * 100:>15.2f}%" for m in results)
+            print(row)
+        print("  " + "-" * (7 + 16 * len(results)))
+        sums = f"  {'SUM':<7}" + "".join(f"{sum(results[m]['weights'].values()) * 100:>15.2f}%" for m in results)
+        print(sums)
+
+        print(f"\n  {'METRIC':<20}" + "".join(f"{m.upper():>16}" for m in results))
+        for label, key in [("expected_return", "expected_return"), ("volatility", "volatility")]:
+            print(f"  {label:<20}" + "".join(f"{results[m]['portfolio'][key] * 100:>15.2f}%" for m in results))
+        print(f"  {'sharpe_ratio':<20}" + "".join(f"{results[m]['portfolio']['sharpe_ratio']:>16.3f}" for m in results))
+        print(f"  {'model (reported)':<20}" + "".join(f"{results[m]['portfolio']['model']:>16}" for m in results))
+        print()
+
+    # Sanity: every model reports itself correctly and stays a valid portfolio.
+    for m, result in results.items():
+        assert result["portfolio"]["model"] == m
+        w = result["weights"]
+        assert abs(sum(w.values()) - 1.0) < 1e-4
+        assert all(v <= _MAX_WEIGHT + 1e-6 for v in w.values())
+        # JPM/GS excluded as non-compliant regardless of optimization model.
+        assert "JPM" not in w and "GS" not in w
+
+    # The three models must NOT produce identical allocations - if they do,
+    # `model=` isn't actually reaching the optimizer.
+    def _rounded(weights):
+        return {t: round(w, 4) for t, w in weights.items()}
+
+    max_sharpe_w = _rounded(results["max_sharpe"]["weights"])
+    min_variance_w = _rounded(results["min_variance"]["weights"])
+    hrp_w = _rounded(results["hrp"]["weights"])
+
+    assert max_sharpe_w != min_variance_w, "max_sharpe and min_variance produced identical weights"
+    assert max_sharpe_w != hrp_w, "max_sharpe and hrp produced identical weights"
+    assert min_variance_w != hrp_w, "min_variance and hrp produced identical weights"

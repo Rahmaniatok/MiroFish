@@ -1,17 +1,23 @@
 """
 Phase 5e — turn the screened, ranked candidate list into actual portfolio weights.
+Phase 5f (`model=`) added two more selectable optimization models alongside the
+original max-Sharpe default.
 
 Phase 5b (`consensus_screener`) selects and ranks compliant candidates using the
 LLM-derived consensus scores. Per the Option A decision, those scores are used
 ONLY for candidate selection / ranking - they are NOT an input to the
 optimization math here. This module takes the tickers that survive Phase 5b and
-runs a classical mean-variance (max-Sharpe) optimization on real historical
-returns:
+runs one of three selectable optimizations on real historical returns:
 
     screen_and_rank(candidates)            # Phase 5b  - compliant, ranked top-K
       -> build_returns_matrix(tickers)     # daily returns from lookahead-safe price data (Phase 1)
-      -> optimize_portfolio(tickers)       # skfolio MeanRisk, Ledoit-Wolf Σ, long-only, capped
-      -> build_portfolio(candidates)       # the end-to-end orchestration
+      -> optimize_portfolio(tickers, model=)  # "max_sharpe" (default) / "min_variance": skfolio
+                                               # MeanRisk, Ledoit-Wolf Σ, long-only, capped, fully
+                                               # invested; "hrp": skfolio HierarchicalRiskParity,
+                                               # same Ledoit-Wolf Σ + long-only + capped, but no
+                                               # objective_function/budget (see that function's
+                                               # docstring for the full model comparison)
+      -> build_portfolio(candidates, model=)  # the end-to-end orchestration
 
 Placement: `app/services/`, alongside `consensus_screener` - this is
 orchestration over the Phase 1 data layer and Phase 5b screener, not raw
@@ -23,7 +29,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 from skfolio.moments import LedoitWolf
-from skfolio.optimization import MeanRisk, ObjectiveFunction
+from skfolio.optimization import HierarchicalRiskParity, MeanRisk, ObjectiveFunction
 from skfolio.prior import EmpiricalPrior
 
 from ..data_layer.market_data import fetch_price_data, get_price_data
@@ -43,6 +49,16 @@ _DEFAULT_RISK_FREE_RATE = 0.0
 # A skfolio weight below this is treated as a true zero (the solver leaves ~1e-10
 # dust on assets it wants out).
 _WEIGHT_EPS = 1e-5
+
+# Selectable optimization models for `optimize_portfolio`/`build_portfolio`.
+# "max_sharpe" / "min_variance" are both `MeanRisk` with the Ledoit-Wolf prior,
+# differing only in `objective_function`. "hrp" is `HierarchicalRiskParity`,
+# a structurally different (clustering + recursive-bisection) allocator with
+# no `objective_function`/`budget` param - see `optimize_portfolio` docstring.
+MODEL_MAX_SHARPE = "max_sharpe"
+MODEL_MIN_VARIANCE = "min_variance"
+MODEL_HRP = "hrp"
+VALID_MODELS = (MODEL_MAX_SHARPE, MODEL_MIN_VARIANCE, MODEL_HRP)
 
 # Expected trading-day count per lookback string, for the "enough history?" test.
 _LOOKBACK_TRADING_DAYS = {
@@ -207,16 +223,33 @@ def optimize_portfolio(
     *,
     lookback: str = "1y",
     risk_free_rate: float = _DEFAULT_RISK_FREE_RATE,
-    objective_function: ObjectiveFunction = ObjectiveFunction.MAXIMIZE_RATIO,
+    model: str = MODEL_MAX_SHARPE,
 ) -> Dict[str, Any]:
-    """Mean-variance optimize `tickers` on real historical returns.
+    """Optimize `tickers` on real historical returns with a selectable model.
 
-    - long-only, fully invested: weights >= 0, sum to 1
+    - long-only: weights >= 0
     - per-asset cap: weight <= `max_weight`
     - covariance: Ledoit-Wolf shrinkage (`EmpiricalPrior(covariance_estimator=LedoitWolf())`)
-    - objective: max-Sharpe (`MAXIMIZE_RATIO`) by default; mean from the sample mean
     - `risk_free_rate` is ANNUALISED (default 0.0, configurable) and feeds both
-      the objective and the reported Sharpe.
+      the max-Sharpe objective (when used) and the reported Sharpe ratio.
+
+    `model` selects the allocator (default `"max_sharpe"`, Phase 5e's original
+    and only behaviour, unchanged):
+      - `"max_sharpe"`: `MeanRisk(objective_function=MAXIMIZE_RATIO)` - fully
+        invested (`budget=1.0`), weights sum to 1.
+      - `"min_variance"`: `MeanRisk(objective_function=MINIMIZE_RISK)` - same
+        Ledoit-Wolf/long-only/budget=1.0 wiring, only the objective differs.
+      - `"hrp"`: `HierarchicalRiskParity` - Lopez de Prado's clustering +
+        recursive-bisection allocator. STRUCTURALLY DIFFERENT from `MeanRisk`:
+        no `objective_function`, no `budget` (full investment is structural,
+        not configurable), no max-Sharpe/min-variance "objective" as such -
+        risk is allocated inversely within each cluster split, defaulting to
+        variance as the risk measure. It DOES accept the same `min_weights`/
+        `max_weights` cap and, verified directly, enforces the identical
+        `sum(max_weights) >= 1` feasibility condition INSIDE its own `fit()`,
+        raising its own `ValueError` (different wording from the manual guard
+        below, same condition, same exception type) - so the manual guard is
+        skipped for this model rather than duplicated.
 
     Returns a dict:
       {
@@ -226,7 +259,8 @@ def optimize_portfolio(
         "sharpe_ratio": float,                # annualised, net of risk_free_rate
         "risk_free_rate": float,              # annualised, as used
         "risk_free_rate_note": str,           # flags that it's configurable
-        "objective": str,
+        "model": str,                         # "max_sharpe" / "min_variance" / "hrp"
+        "objective": str,                     # skfolio objective/risk-measure name
         "lookback": str,
         "n_assets_optimized": int,
         "tickers_in": [...],                  # what was passed in
@@ -234,10 +268,15 @@ def optimize_portfolio(
       }
 
     Raises:
-        ValueError: if fewer than 2 tickers have usable history, or if the
-            per-asset cap makes a long-only sum-to-1 portfolio infeasible
-            (n_assets * max_weight < 1).
+        ValueError: if `model` is not one of `VALID_MODELS`; if fewer than 2
+            tickers have usable history; or if the per-asset cap makes a
+            long-only sum-to-1 portfolio infeasible (n_assets * max_weight < 1)
+            - raised by the manual guard for "max_sharpe"/"min_variance", or
+              by skfolio's own `HierarchicalRiskParity.fit()` for "hrp".
     """
+    if model not in VALID_MODELS:
+        raise ValueError(f"model must be one of {VALID_MODELS}, got {model!r}")
+
     if not 0 < max_weight <= 1:
         raise ValueError(f"max_weight must be in (0, 1], got {max_weight}")
 
@@ -253,32 +292,52 @@ def optimize_portfolio(
             f"Dropped: {[d['ticker'] for d in dropped] or 'none'}."
         )
 
-    # Feasibility of long-only + sum-to-1 + scalar per-asset cap.
-    min_assets_needed = int(np.ceil(1.0 / max_weight - 1e-9))
-    if len(assets) * max_weight < 1.0 - 1e-9:
-        raise ValueError(
-            f"Cannot optimize: {len(assets)} compliant tickers remain but "
-            f"max_weight={max_weight:g} requires at least {min_assets_needed} "
-            f"({len(assets)} * {max_weight:g} = {len(assets) * max_weight:.2f} < 1.0). "
-            f"Reduce max_weight or provide more candidate tickers."
-        )
-
     rf_annual = float(risk_free_rate)
     rf_period = (1.0 + rf_annual) ** (1.0 / _TRADING_DAYS_PER_YEAR) - 1.0
 
-    model = MeanRisk(
-        objective_function=objective_function,
-        prior_estimator=EmpiricalPrior(covariance_estimator=LedoitWolf()),
-        min_weights=0.0,            # long-only
-        max_weights=float(max_weight),
-        budget=1.0,                 # fully invested, weights sum to 1
-        risk_free_rate=rf_period,
-        portfolio_params={"risk_free_rate": rf_period},
-    )
-    model.fit(returns)
-    portfolio = model.predict(returns)
+    if model == MODEL_HRP:
+        # No manual feasibility pre-check here: HRP has no `budget`/
+        # `objective_function` and enforces `sum(max_weights) >= 1` itself
+        # inside `fit()` (see docstring above) - duplicating that check with
+        # our own wording would just be a second guard for the same condition.
+        opt_model = HierarchicalRiskParity(
+            prior_estimator=EmpiricalPrior(covariance_estimator=LedoitWolf()),
+            min_weights=0.0,
+            max_weights=float(max_weight),
+            portfolio_params={"risk_free_rate": rf_period},
+        )
+        objective_label = f"HRP_{opt_model.risk_measure.name}"
+    else:
+        # Feasibility of long-only + sum-to-1 + scalar per-asset cap
+        # (MeanRisk-based models only - HRP enforces this itself, see above).
+        min_assets_needed = int(np.ceil(1.0 / max_weight - 1e-9))
+        if len(assets) * max_weight < 1.0 - 1e-9:
+            raise ValueError(
+                f"Cannot optimize: {len(assets)} compliant tickers remain but "
+                f"max_weight={max_weight:g} requires at least {min_assets_needed} "
+                f"({len(assets)} * {max_weight:g} = {len(assets) * max_weight:.2f} < 1.0). "
+                f"Reduce max_weight or provide more candidate tickers."
+            )
 
-    raw_weights = dict(zip(model.feature_names_in_, np.asarray(model.weights_, dtype=float)))
+        objective_function = (
+            ObjectiveFunction.MAXIMIZE_RATIO if model == MODEL_MAX_SHARPE
+            else ObjectiveFunction.MINIMIZE_RISK
+        )
+        opt_model = MeanRisk(
+            objective_function=objective_function,
+            prior_estimator=EmpiricalPrior(covariance_estimator=LedoitWolf()),
+            min_weights=0.0,            # long-only
+            max_weights=float(max_weight),
+            budget=1.0,                 # fully invested, weights sum to 1
+            risk_free_rate=rf_period,
+            portfolio_params={"risk_free_rate": rf_period},
+        )
+        objective_label = objective_function.name
+
+    opt_model.fit(returns)
+    portfolio = opt_model.predict(returns)
+
+    raw_weights = dict(zip(opt_model.feature_names_in_, np.asarray(opt_model.weights_, dtype=float)))
     weights = {
         t: round(float(w), 6)
         for t, w in sorted(raw_weights.items(), key=lambda kv: kv[1], reverse=True)
@@ -295,7 +354,8 @@ def optimize_portfolio(
             "annualised; default 0.0, configurable via risk_free_rate= "
             "(feeds both the max-Sharpe objective and this ratio)"
         ),
-        "objective": objective_function.name,
+        "model": model,
+        "objective": objective_label,
         "lookback": lookback,
         "n_assets_optimized": len(assets),
         "tickers_in": [(t or "").strip().upper() for t in tickers],
@@ -311,12 +371,16 @@ def build_portfolio(
     *,
     lookback: str = "1y",
     risk_free_rate: float = _DEFAULT_RISK_FREE_RATE,
+    model: str = MODEL_MAX_SHARPE,
 ) -> Dict[str, Any]:
-    """End-to-end: screen + rank (Phase 5b) -> mean-variance optimize (Phase 5e).
+    """End-to-end: screen + rank (Phase 5b) -> optimize (Phase 5e/5f).
 
     1. `screen_and_rank(candidate_tickers, as_of_date, top_k)` - the compliant,
        consensus-ranked top-K. Non-compliant names (JPM, GS, ...) never get here.
-    2. `optimize_portfolio(...)` on exactly those tickers.
+    2. `optimize_portfolio(..., model=model)` on exactly those tickers - `model`
+       is `"max_sharpe"` (default), `"min_variance"`, or `"hrp"`; see that
+       function's docstring for what each one is and how the two families
+       (MeanRisk vs HierarchicalRiskParity) differ.
 
     Returns:
       {
@@ -365,7 +429,7 @@ def build_portfolio(
 
     opt = optimize_portfolio(
         ranked_tickers, as_of_date=as_of_date, max_weight=max_weight,
-        lookback=lookback, risk_free_rate=risk_free_rate,
+        lookback=lookback, risk_free_rate=risk_free_rate, model=model,
     )
     weights = opt["weights"]
     dropped_by_ticker = {d["ticker"]: d["reason"] for d in opt["dropped"]}
@@ -399,6 +463,7 @@ def build_portfolio(
             "sharpe_ratio": opt["sharpe_ratio"],
             "risk_free_rate": opt["risk_free_rate"],
             "risk_free_rate_note": opt["risk_free_rate_note"],
+            "model": opt["model"],
             "objective": opt["objective"],
             "lookback": opt["lookback"],
             "n_assets_optimized": opt["n_assets_optimized"],

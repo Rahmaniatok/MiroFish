@@ -40,6 +40,9 @@ def create_app(config_class=Config):
         logger.info("=" * 50)
     
     # 启用CORS
+    # TODO: origins="*" is permissive-for-local-dev only (Phase 7a decision).
+    # Scope this to specific origins (e.g. the deployed frontend's domain)
+    # before any real/public deployment.
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     
     # 注册模拟进程清理函数（确保服务器关闭时终止所有模拟进程）
@@ -63,10 +66,12 @@ def create_app(config_class=Config):
         return response
     
     # 注册蓝图
-    from .api import graph_bp, simulation_bp, report_bp
+    from .api import graph_bp, simulation_bp, report_bp, portfolio_bp, universe_bp
     app.register_blueprint(graph_bp, url_prefix='/api/graph')
     app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
     app.register_blueprint(report_bp, url_prefix='/api/report')
+    app.register_blueprint(portfolio_bp, url_prefix='/api/portfolio')
+    app.register_blueprint(universe_bp, url_prefix='/api/universe')
     
     # 健康检查
     @app.route('/health')

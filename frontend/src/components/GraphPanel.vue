@@ -209,7 +209,7 @@
       <!-- 等待/空状态 -->
       <div v-else class="graph-state">
         <div class="empty-icon">❖</div>
-        <p class="empty-text">{{ $t('graph.waitingOntology') }}</p>
+        <p class="empty-text">{{ emptyStateText || $t('graph.waitingOntology') }}</p>
       </div>
     </div>
 
@@ -243,7 +243,10 @@ const props = defineProps({
   graphData: Object,
   loading: Boolean,
   currentPhase: Number,
-  isSimulating: Boolean
+  isSimulating: Boolean,
+  // Optional override for the empty-state message (defaults to the
+  // ontology-specific i18n string, which doesn't fit non-OASIS consumers).
+  emptyStateText: String
 })
 
 const emit = defineEmits(['refresh', 'toggle-maximize'])

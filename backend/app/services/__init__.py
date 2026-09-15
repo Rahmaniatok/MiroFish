@@ -20,6 +20,10 @@ from .portfolio_optimizer import (
     build_returns_matrix,
     optimize_portfolio,
     build_portfolio,
+    VALID_MODELS,
+    MODEL_MAX_SHARPE,
+    MODEL_MIN_VARIANCE,
+    MODEL_HRP,
 )
 from .portfolio_agent import PortfolioAgent, PortfolioAgentError
 from .debate_room import (
@@ -82,6 +86,10 @@ __all__ = [
     'build_returns_matrix',
     'optimize_portfolio',
     'build_portfolio',
+    'VALID_MODELS',
+    'MODEL_MAX_SHARPE',
+    'MODEL_MIN_VARIANCE',
+    'MODEL_HRP',
     'PortfolioAgent',
     'PortfolioAgentError',
     'DebateRoom',

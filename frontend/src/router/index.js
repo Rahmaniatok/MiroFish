@@ -5,6 +5,8 @@ import SimulationView from '../views/SimulationView.vue'
 import SimulationRunView from '../views/SimulationRunView.vue'
 import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
+import DashboardShellView from '../views/dashboard/DashboardShellView.vue'
+import FinalPortfolioView from '../views/dashboard/FinalPortfolioView.vue'
 
 const routes = [
   {
@@ -41,6 +43,21 @@ const routes = [
     name: 'Interaction',
     component: InteractionView,
     props: true
+  },
+  // Phase 7b — investment dashboard (Phase 1-6 services via the Phase 7a API),
+  // rebuilt on MiroFish's own Graph/Split/Workbench shell (see MainView.vue)
+  // instead of a generic redesign. One route: steps are internal state, same
+  // as the old Process view's Step1-5 switching. None of the OASIS/ontology
+  // routes above are touched.
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: DashboardShellView
+  },
+  {
+    path: '/dashboard/portfolio',
+    name: 'FinalPortfolio',
+    component: FinalPortfolioView
   }
 ]
 
