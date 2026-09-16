@@ -56,5 +56,9 @@ backend/logs/
 # 上传文件
 backend/uploads/
 
+# 本地数据库（Universe & Correlation Graph, SQLite）
+backend/instance/
+*.db
+
 # Docker 数据
 data/
