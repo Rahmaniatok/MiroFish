@@ -26,6 +26,7 @@ from ..services.simulation_manager import SimulationManager
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..services.zep_graph_memory_updater import ZepGraphMemoryManager
 from ..utils.llm_client import LLMResponseError
+from ..services.correlation_builder import build_correlation_edges
 
 # 获取日志器
 logger = get_logger('mirofish.api')
@@ -952,10 +953,88 @@ def delete_graph(graph_id: str):
             "success": True,
             "message": t('api.graphDeleted', id=graph_id)
         })
-        
+
     except GraphInUseError as e:
         return jsonify({"success": False, "error": str(e)}), 409
     except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+# ============== Correlation Graph 接口（取代原 GraphRAG /build） ==============
+
+@graph_bp.route('/correlation/build', methods=['POST'])
+def build_correlation_graph():
+    """
+    基于历史价格数据计算 StockNode 两两相关性，写入 CorrelationEdge。
+    只读 StockNode，不写 StockNode；不调用任何 LLM。
+
+    请求（JSON）：
+        {
+            "method": "pearson" | "spearman",  // 可选，默认 "spearman"
+            "type": "return" | "price",        // 可选，默认 "return"
+            "start_date": "2023-01-01",        // 必填
+            "end_date": "2025-12-31"           // 必填
+        }
+
+    返回：
+        {
+            "success": true,
+            "data": {
+                "method", "type", "start_date", "end_date",
+                "tickers_considered", "tickers_with_data", "tickers_dropped_no_data",
+                "edges_deleted", "edges_created", "correlation_edge_threshold",
+                "top_edges": [{source_ticker, target_ticker, correlation_weight}, ...]
+            }
+        }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+
+        method = data.get('method', 'spearman')
+        calc_type = data.get('type', 'return')
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        if method not in ('pearson', 'spearman'):
+            return jsonify({
+                "success": False,
+                "error": "method must be 'pearson' or 'spearman'"
+            }), 400
+        if calc_type not in ('return', 'price'):
+            return jsonify({
+                "success": False,
+                "error": "type must be 'return' or 'price'"
+            }), 400
+        if not start_date or not end_date:
+            return jsonify({
+                "success": False,
+                "error": "start_date and end_date are required"
+            }), 400
+
+        logger.info(
+            f"构建相关性图谱: method={method}, type={calc_type}, "
+            f"start_date={start_date}, end_date={end_date}"
+        )
+        result = build_correlation_edges(
+            method=method,
+            calc_type=calc_type,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return jsonify({
+            "success": True,
+            "data": result,
+        })
+
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.exception("相关性图谱构建失败")
         return jsonify({
             "success": False,
             "error": str(e),
