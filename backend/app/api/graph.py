@@ -27,6 +27,7 @@ from ..services.simulation_runner import SimulationRunner, RunnerStatus
 from ..services.zep_graph_memory_updater import ZepGraphMemoryManager
 from ..utils.llm_client import LLMResponseError
 from ..services.correlation_builder import build_correlation_edges
+from ..services.cluster_detector import detect_clusters
 
 # 获取日志器
 logger = get_logger('mirofish.api')
@@ -1035,6 +1036,69 @@ def build_correlation_graph():
         return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
         logger.exception("相关性图谱构建失败")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
+# ============== Cluster 检测接口（取代原 "Generated Entity/Relation Types"） ==============
+
+@graph_bp.route('/cluster/detect', methods=['POST'])
+def detect_cluster_graph():
+    """
+    从 CorrelationEdge 构建图，跑 Louvain 社区发现，每个 cluster 调用一次 LLM
+    生成 label+description，写入 StockCluster 并回填 StockNode.cluster_id。
+    只读 StockNode/CorrelationEdge。
+
+    请求（JSON）：
+        {
+            "method": "louvain",                  // 可选，默认 "louvain"
+            "correlation_method": "pearson" | "spearman"  // 必填
+        }
+
+    返回：
+        {
+            "success": true,
+            "data": {
+                "method", "correlation_method", "cluster_count",
+                "clusters": [{cluster_id, label, description, member_count, sample_members}, ...],
+                "stock_nodes_with_correlation_edges",
+                "stock_nodes_with_cluster_id",
+                "stock_nodes_null_cluster_pct"
+            }
+        }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+
+        method = data.get('method', 'louvain')
+        correlation_method = data.get('correlation_method')
+
+        if method != 'louvain':
+            return jsonify({
+                "success": False,
+                "error": "method must be 'louvain'"
+            }), 400
+        if correlation_method not in ('pearson', 'spearman'):
+            return jsonify({
+                "success": False,
+                "error": "correlation_method must be 'pearson' or 'spearman'"
+            }), 400
+
+        logger.info(f"检测 cluster: method={method}, correlation_method={correlation_method}")
+        result = detect_clusters(method=method, correlation_method=correlation_method)
+
+        return jsonify({
+            "success": True,
+            "data": result,
+        })
+
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        logger.exception("Cluster 检测失败")
         return jsonify({
             "success": False,
             "error": str(e),
