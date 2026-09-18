@@ -1,0 +1,3097 @@
+[
+  {
+    "id": "03fd45c4-5814-4a98-b19f-0f88e8198d22",
+    "content": {
+      "id": "03fd45c4-5814-4a98-b19f-0f88e8198d22",
+      "contentType": "VIDEO",
+      "title": "Frontier AI developers must be 'liable for the things their products do': Autodesk CEO",
+      "description": "<p>Discourse has been circulating recently on AI safety, fears, and regulation, with commentary from Nvidia (<a target=\"_blank\" rel=\"\" class=\"link\" href=\"https://finance.yahoo.com/quote/NVDA/\" data-i13n=\"cpos:1;pos:1\">NVDA</a>) CEO Jensen Huang, Anthropic (<a target=\"_blank\" rel=\"\" class=\"link\" href=\"https://finance.yahoo.com/quote/ANTH.PVT/\" data-i13n=\"cpos:2;pos:1\">ANTH.PVT</a>) CEO Dario Amodei, and even President Trump.</p>\n<p>Autodesk (<a target=\"_blank\" rel=\"\" class=\"link\" href=\"https://finance.yahoo.com/quote/ADSK/\" data-i13n=\"cpos:3;pos:1\">ADSK</a>) president and CEO Andrew Anagnost sits down with Market Catalysts host Julie Hyman to share his thoughts on the importance of holding Big Tech accountable.</p>",
+      "summary": "Discourse has been circulating recently on AI safety, fears, and regulation, with commentary from Nvidia (NVDA) CEO Jensen Huang, Anthropic (ANTH.PVT) CEO Dario Amodei, and even President Trump. Autodesk (ADSK) president and CEO Andrew Anagnost sits down with Market Catalysts host Julie Hyman to share his thoughts on the importance of holding Big Tech accountable.",
+      "pubDate": "2026-09-16T15:09:55Z",
+      "displayTime": "",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://s.yimg.com/uu/api/res/1.2/nAssQl2Bt_7vF.X4NLLV_Q--~B/aD03Njc7dz0xMzY0O2FwcGlkPXl0YWNoeW9u/https://d29szjachogqwa.cloudfront.net/images/user-uploaded/chatgpt-image-sep-16-2026-11-07-56-am_6933.png_6baf05bf52e7957de111d94c9adcd03f7bb3609d7cb8ab03029a84ffa76da0e5.png",
+        "originalWidth": 1364,
+        "originalHeight": 767,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/nAssQl2Bt_7vF.X4NLLV_Q--~B/aD03Njc7dz0xMzY0O2FwcGlkPXl0YWNoeW9u/https://d29szjachogqwa.cloudfront.net/images/user-uploaded/chatgpt-image-sep-16-2026-11-07-56-am_6933.png_6baf05bf52e7957de111d94c9adcd03f7bb3609d7cb8ab03029a84ffa76da0e5.png",
+            "width": 1364,
+            "height": 767,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/leUCeL3_X8Vu94kJej1FyQ--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://d29szjachogqwa.cloudfront.net/images/user-uploaded/chatgpt-image-sep-16-2026-11-07-56-am_6933.png_6baf05bf52e7957de111d94c9adcd03f7bb3609d7cb8ab03029a84ffa76da0e5.png",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Yahoo Finance Video",
+        "url": "https://finance.yahoo.com/",
+        "sourceId": "video.yahoofinance.com"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/video/frontier-ai-developers-must-liable-150955074.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/video/frontier-ai-developers-must-liable-150955074.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": true
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "14bae1ab-d36c-4317-85ab-8c085273348f",
+    "content": {
+      "id": "14bae1ab-d36c-4317-85ab-8c085273348f",
+      "contentType": "VIDEO",
+      "title": "Amodei and Huang lay out paths for AI: \u2018Set standards\u2019 or \u2018pace yourself\u2019?",
+      "description": "<p>Anthropic CEO Dario Amodei and Nvidia (<a target=\"_blank\" rel=\"\" class=\"link\" href=\"https://finance.yahoo.com/quote/NVDA/\" data-i13n=\"cpos:1;pos:1\">NVDA</a>) CEO Jensen Huang laid out their visions for AI development during remarks at Salesforce\u2019s Dreamforce conference in San Francisco, with Amodei focusing on setting industry standards and fostering global cooperation. Later, Huang emphasized prioritizing safety and product quality in companies over new regulations. </p>",
+      "summary": "Anthropic CEO Dario Amodei and Nvidia (NVDA) CEO Jensen Huang laid out their visions for AI development during remarks at Salesforce\u2019s Dreamforce conference in San Francisco, with Amodei focusing on setting industry standards and fostering global cooperation. Later, Huang emphasized prioritizing safety and product quality in companies over new regulations.",
+      "pubDate": "2026-09-16T13:51:14Z",
+      "displayTime": "",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://s.yimg.com/uu/api/res/1.2/4f8UNPUJF57kSW.fBbmHlQ--~B/aD0xMjA0O3c9MjE0MjthcHBpZD15dGFjaHlvbg--/https://d29szjachogqwa.cloudfront.net/images/user-uploaded/a0f836fb-6ac1-4950-97a2-2c7b0f105794_67b1071baf53ada8435b74c988e05f4397bfef395ff3db2077470796f0d49e80.jpg",
+        "originalWidth": 2142,
+        "originalHeight": 1204,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/4f8UNPUJF57kSW.fBbmHlQ--~B/aD0xMjA0O3c9MjE0MjthcHBpZD15dGFjaHlvbg--/https://d29szjachogqwa.cloudfront.net/images/user-uploaded/a0f836fb-6ac1-4950-97a2-2c7b0f105794_67b1071baf53ada8435b74c988e05f4397bfef395ff3db2077470796f0d49e80.jpg",
+            "width": 2142,
+            "height": 1204,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/UbT_okdCLgAUwpWfdB1OwQ--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://d29szjachogqwa.cloudfront.net/images/user-uploaded/a0f836fb-6ac1-4950-97a2-2c7b0f105794_67b1071baf53ada8435b74c988e05f4397bfef395ff3db2077470796f0d49e80.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Yahoo Finance Video",
+        "url": "https://finance.yahoo.com/",
+        "sourceId": "video.yahoofinance.com"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/video/amodei-huang-lay-paths-ai-135114535.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/video/amodei-huang-lay-paths-ai-135114535.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": true
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "8938db02-d4c1-3852-aad9-256921f3a99f",
+    "content": {
+      "id": "8938db02-d4c1-3852-aad9-256921f3a99f",
+      "contentType": "STORY",
+      "title": "Should You Avoid Wendy's Stock, Even After a 66% Decline?",
+      "description": "",
+      "summary": "Wendy's new CEO laid out his vision to improve results.",
+      "pubDate": "2026-09-17T10:05:00Z",
+      "displayTime": "2026-09-17T10:05:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/31a2809244cc56e1fdc1b3d30b2e6919.jpg",
+        "originalWidth": 1199,
+        "originalHeight": 800,
+        "caption": "People sitting in a restaurant eating burgers.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/BDqQlD9UPE3f7ojih9zjcA--~B/aD04MDA7dz0xMTk5O2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/31a2809244cc56e1fdc1b3d30b2e6919.jpg",
+            "width": 1199,
+            "height": 800,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/KTBnPcifZl.JIwuV8Dyuzw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/31a2809244cc56e1fdc1b3d30b2e6919.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/should-you-avoid-wendys-stock/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/avoid-wendys-stock-even-66-100500855.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "06f8ab20-faeb-3b7b-b682-05d84b00562c",
+    "content": {
+      "id": "06f8ab20-faeb-3b7b-b682-05d84b00562c",
+      "contentType": "STORY",
+      "title": "Berkshire Hathaway Has 30.6% of Its Portfolio in These 2 Magnificent AI Stocks. Here's Why That's a Signal Worth Watching.",
+      "description": "",
+      "summary": "Berkshire Hathaway is known for holding stable, boring stocks, but it still has significant exposure to AI companies.",
+      "pubDate": "2026-09-17T10:04:00Z",
+      "displayTime": "2026-09-17T10:04:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/1f8a2803afbc1aded89dfa1f244a1909.png",
+        "originalWidth": 1200,
+        "originalHeight": 800,
+        "caption": "Apple logo beside the word Alphabet on a red and black background.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/1Z2InVfwA0Pmy6FqKkNQQg--~B/aD04MDA7dz0xMjAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/1f8a2803afbc1aded89dfa1f244a1909.png",
+            "width": 1200,
+            "height": 800,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/WAkShArzTfJRJVvWGpUrFg--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/1f8a2803afbc1aded89dfa1f244a1909.png",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/berkshire-hathaway-portfolio-ai-stocks-aapl-goog/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/berkshire-hathaway-30-6-portfolio-100400652.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "3a7aa227-cd3b-38c0-82e9-5127f18d760e",
+    "content": {
+      "id": "3a7aa227-cd3b-38c0-82e9-5127f18d760e",
+      "contentType": "STORY",
+      "title": "Bond Market Sell-Off: Is It Really Safe to Invest Right Now?",
+      "description": "",
+      "summary": "Bond investors are dumping government bonds and sending yields higher.",
+      "pubDate": "2026-09-17T09:55:00Z",
+      "displayTime": "2026-09-17T09:55:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/941e5c29bd26ac18f06e742644e8d4c3.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "A pile of coins and an arrow showing rates rising.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/g3rKO2EjOH9vNLquaOWoHQ--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/941e5c29bd26ac18f06e742644e8d4c3.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/1bk7BaVZLg8G6aB0L.wo.w--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/941e5c29bd26ac18f06e742644e8d4c3.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/bond-market-sell-off-is-it-really-safe-to-invest-r/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/bond-market-sell-off-really-095500710.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "6aa46772-c482-342e-8cfc-b5fad4c5d27a",
+    "content": {
+      "id": "6aa46772-c482-342e-8cfc-b5fad4c5d27a",
+      "contentType": "STORY",
+      "title": "What Would It Actually Take to Move Visa's Take Rate?",
+      "description": "",
+      "summary": "After all, this is awfully modest; it doesn't even reach 0.3%.",
+      "pubDate": "2026-09-17T09:50:00Z",
+      "displayTime": "2026-09-17T09:50:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/4d660fe1f39843cc7c55fa1123c54094.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "Person happily holding a credit card while seated at a sofa, and using a laptop.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/BpM7Zo_hnjiym0luhwVLZg--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/4d660fe1f39843cc7c55fa1123c54094.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/UaR056bOP0qFDCSKrdEm7g--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/4d660fe1f39843cc7c55fa1123c54094.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/what-would-it-actually-take-to-move-visas-take-rat/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/actually-move-visas-rate-095000210.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "fa08c896-241f-382d-a932-1e206efdab0f",
+    "content": {
+      "id": "fa08c896-241f-382d-a932-1e206efdab0f",
+      "contentType": "STORY",
+      "title": "The Crypto Bear Market Is Ending. I Predict These 3 Coins Will Be Worth Buying and Holding for at Least 3 Years",
+      "description": "",
+      "summary": "The likely winners of the coming market cycle are already pulling ahead.",
+      "pubDate": "2026-09-17T09:29:00Z",
+      "displayTime": "2026-09-17T09:29:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/a46f20311b3d9c2aef5d847af9209702.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 934,
+        "caption": "An investor sits in a cafe in front of a laptop computer, examining a few papers.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/ibT3LdMoUbjNfOqJNMpkGQ--~B/aD05MzQ7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/a46f20311b3d9c2aef5d847af9209702.jpg",
+            "width": 1400,
+            "height": 934,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/AlCV5jsYgTnmYwOFGSWUhQ--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/a46f20311b3d9c2aef5d847af9209702.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/the-crypto-bear-market-is-ending-i-predict-these-3/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/crypto/articles/crypto-bear-market-ending-predict-092900431.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "8a9d2139-cfe6-3264-a6dc-9f82ede3280e",
+    "content": {
+      "id": "8a9d2139-cfe6-3264-a6dc-9f82ede3280e",
+      "contentType": "STORY",
+      "title": "The Puzzle Pieces for an AI Bubble-Bursting Event Are Falling Into Place",
+      "description": "",
+      "summary": "The hottest technological trend of the decade appears to be running on borrowed time.",
+      "pubDate": "2026-09-17T09:26:01Z",
+      "displayTime": "2026-09-17T09:26:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/ae034592327a4a70f3763fa7fd9dfad0.jpg",
+        "originalWidth": 1200,
+        "originalHeight": 782,
+        "caption": "A New York Stock Exchange floor trader looking up in awe at a computer monitor.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/wj7D.Ktiwcb9aR95uNhwCw--~B/aD03ODI7dz0xMjAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/ae034592327a4a70f3763fa7fd9dfad0.jpg",
+            "width": 1200,
+            "height": 782,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/MF4Mfwsf_RPYDXwN1nMcOg--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/ae034592327a4a70f3763fa7fd9dfad0.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/the-puzzle-pieces-for-an-ai-bubble-bursting-event-are-falling-into-place/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/puzzle-pieces-ai-bubble-bursting-092601390.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "24e5fb6e-8e38-3131-819f-2617be7845a6",
+    "content": {
+      "id": "24e5fb6e-8e38-3131-819f-2617be7845a6",
+      "contentType": "STORY",
+      "title": "SpaceX CFO: New Compute Deal Puts Company Closer to $100B ARR Goal",
+      "description": "",
+      "summary": "The company is closer to achieving its audacious goal than investors might think.",
+      "pubDate": "2026-09-17T09:22:01Z",
+      "displayTime": "2026-09-17T09:22:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/8ec6443afcf9a9d044d7148204545fbd.jpg",
+        "originalWidth": 1200,
+        "originalHeight": 800,
+        "caption": "SpaceX logo in white over a dark, partially lit Earth seen from space",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/F6OW6KqLeg7srIDRQvyIIg--~B/aD04MDA7dz0xMjAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/8ec6443afcf9a9d044d7148204545fbd.jpg",
+            "width": 1200,
+            "height": 800,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/hoKPrXLwPpxfuKpl4KOCfA--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/8ec6443afcf9a9d044d7148204545fbd.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/spacex-cfo-new-compute-deal-puts-company-closer-to-100b-arr-goal/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/spacex-cfo-compute-deal-puts-092201326.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "9ff67b25-3354-3cfa-84e1-64890e15391a",
+    "content": {
+      "id": "9ff67b25-3354-3cfa-84e1-64890e15391a",
+      "contentType": "STORY",
+      "title": "As the Stock Market Eerily Repeats a Pattern Not Seen Since 2000, Warren Buffett Has a Blunt Message for Investors",
+      "description": "",
+      "summary": "The legend always gives investors a reality check.",
+      "pubDate": "2026-09-17T09:20:00Z",
+      "displayTime": "2026-09-17T09:20:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/d690b940d30928910dee71ecf4216775.jpg",
+        "originalWidth": 960,
+        "originalHeight": 640,
+        "caption": "Warren Buffett. ",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/5.rtBqd4bmktfT8f4TOlAQ--~B/aD02NDA7dz05NjA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/d690b940d30928910dee71ecf4216775.jpg",
+            "width": 960,
+            "height": 640,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/KFwGPwMpsgxwXKfr4JhPpQ--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/d690b940d30928910dee71ecf4216775.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/as-the-stock-market-eerily-repeats-a-pattern-not-s/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/stock-market-eerily-repeats-pattern-092000202.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "f1d913da-ea62-3f13-99d4-45e44f89abef",
+    "content": {
+      "id": "f1d913da-ea62-3f13-99d4-45e44f89abef",
+      "contentType": "STORY",
+      "title": "Pfizer's Dividend Faces Big Questions. Here Are 3 Reasons It Should Survive.",
+      "description": "",
+      "summary": "Income investors shouldn't be too worried about the pharma giant cutting its dividend.",
+      "pubDate": "2026-09-17T09:04:00Z",
+      "displayTime": "2026-09-17T09:04:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/6213520419e81535737984601d67efc2.jpg",
+        "originalWidth": 1024,
+        "originalHeight": 652,
+        "caption": "Pfizer logo on glass.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/qPqHHs4b7ieIQJ80RFdcXw--~B/aD02NTI7dz0xMDI0O2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/6213520419e81535737984601d67efc2.jpg",
+            "width": 1024,
+            "height": 652,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/1SXo.JeM0oe0Ky9aWqbh.w--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/6213520419e81535737984601d67efc2.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/pfizers-dividend-faces-big-questions-here-are-3-re/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/healthcare/articles/pfizers-dividend-faces-big-questions-090400927.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "8c488316-4eef-3449-b37e-335cd15c579e",
+    "content": {
+      "id": "8c488316-4eef-3449-b37e-335cd15c579e",
+      "contentType": "STORY",
+      "title": "Nvidia, AWS and Salesforce Say Yes to Snap's Glasses. Wall Street Says Hold",
+      "description": "",
+      "summary": "Snap AR glasses land Nvidia, AWS and Salesforce as enterprise partners. The stock is still down 30% this year.",
+      "pubDate": "2026-09-17T09:00:14Z",
+      "displayTime": "2026-09-17T09:00:14Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/beincrypto_us_662/c66a0f9a62c09a310adfcd0e6d653d59.jpg",
+        "originalWidth": 5120,
+        "originalHeight": 2880,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/.cW5W1Em6br81XOr2UldZA--~B/aD0yODgwO3c9NTEyMDthcHBpZD15dGFjaHlvbg--/https://media.zenfs.com/en/beincrypto_us_662/c66a0f9a62c09a310adfcd0e6d653d59.jpg",
+            "width": 5120,
+            "height": 2880,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/ijBeBFalQrR_8yNPyDlNYw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/beincrypto_us_662/c66a0f9a62c09a310adfcd0e6d653d59.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "BeInCrypto",
+        "url": "https://beincrypto.com/",
+        "sourceId": "beincrypto_us_662"
+      },
+      "canonicalUrl": {
+        "url": "https://beincrypto.com/snap-ar-glasses-enterprise-partners/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/nvidia-aws-salesforce-yes-snaps-090014526.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "655fe8e6-3cb9-33ec-95d4-b5b2ad7d588b",
+    "content": {
+      "id": "655fe8e6-3cb9-33ec-95d4-b5b2ad7d588b",
+      "contentType": "STORY",
+      "title": "The S&P 500 Is Near Record Highs. History Says That's Not a Good Reason to Stop Buying This ETF",
+      "description": "",
+      "summary": "Historical forward-looking returns have actually been better when the S&P 500 is at a record high.",
+      "pubDate": "2026-09-17T08:50:00Z",
+      "displayTime": "2026-09-17T08:50:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/f622391b09a47adf1b4a98f84868a393.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "Market indexes on a digital board.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/0yKf7ThU7NNDLTfrpUUxrg--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/f622391b09a47adf1b4a98f84868a393.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Wf.Te4aKKcdGMQhBAIUz4g--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/f622391b09a47adf1b4a98f84868a393.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/sp-500-record-high-history-says-buy-this-etf/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/p-500-near-record-highs-085000795.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "c68a0f7c-14d4-3329-9f26-ee1a6ac1296f",
+    "content": {
+      "id": "c68a0f7c-14d4-3329-9f26-ee1a6ac1296f",
+      "contentType": "STORY",
+      "title": "This Trend is Excellent News for Eli Lilly and Its Investors",
+      "description": "",
+      "summary": "Eli Lilly and Novo Nordisk are vying for a new part of the weight loss drug market.",
+      "pubDate": "2026-09-17T08:35:01Z",
+      "displayTime": "2026-09-17T08:35:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/784b4e6e4c377e15286f9d54b6b88a7a.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "An investor smiles while sitting behind a laptop.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/HKJBpbIAH03scCoIxGuZnQ--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/784b4e6e4c377e15286f9d54b6b88a7a.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/BEX8_L8XxlGTxNh0v0Vcjw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/784b4e6e4c377e15286f9d54b6b88a7a.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/this-trend-is-excellent-news-for-eli-lilly-and-its-investors/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/healthcare/articles/trend-excellent-news-eli-lilly-083501471.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "2e0833f3-ce20-3c9f-bed7-1efd6b96b72d",
+    "content": {
+      "id": "2e0833f3-ce20-3c9f-bed7-1efd6b96b72d",
+      "contentType": "STORY",
+      "title": "Nasdaq, S&P 500 Futures Rebound After Fed Rate Hike: NVDA, NBIS, SNAP, SPCX, BE, GNRC Stocks In Focus",
+      "description": "",
+      "summary": "Retail sentiment on SPY and QQQ remained \u2018bearish\u2019, even as futures recovered.",
+      "pubDate": "2026-09-17T08:34:15Z",
+      "displayTime": "2026-09-17T08:34:15Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/stocktwits_383/2163259cfc8129547adbb82f899db9c9.jpg",
+        "originalWidth": 1280,
+        "originalHeight": 853,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/J2ATY9ZWIpxXvYQ68lhCHw--~B/aD04NTM7dz0xMjgwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/stocktwits_383/2163259cfc8129547adbb82f899db9c9.jpg",
+            "width": 1280,
+            "height": 853,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/d4Q81sokRfKxoFbWVi_D4w--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/stocktwits_383/2163259cfc8129547adbb82f899db9c9.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Stocktwits",
+        "url": "Stocktwits",
+        "sourceId": "stocktwits_383"
+      },
+      "canonicalUrl": {
+        "url": "https://stocktwits.com/news-articles/markets/equity/nasdaq-sp500-futures-rebound-after-fed-rate-hike-nvda-nbis-snap-spcx-be-gnrc-stocks-in-focus/cZtr1S2RB51",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/nasdaq-p-500-futures-rebound-083415053.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "41cb4c79-a60b-363b-9e60-4636823473db",
+    "content": {
+      "id": "41cb4c79-a60b-363b-9e60-4636823473db",
+      "contentType": "STORY",
+      "title": "2 Top Stocks That Can Double in 5 Years",
+      "description": "",
+      "summary": "These stocks offer an attractive combination of value and growth.",
+      "pubDate": "2026-09-17T08:30:00Z",
+      "displayTime": "2026-09-17T08:30:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/9c2794835c13a35c99b738ed239b19bc.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "A green arrow with Benjamin Franklin's face in the background.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/9a5e8cvyrD1PrCrPj7RfaA--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/9c2794835c13a35c99b738ed239b19bc.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/9twUagtTwVvqe_mOm5XXLw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/9c2794835c13a35c99b738ed239b19bc.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/2-top-stocks-that-can-double-in-5-years/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/2-top-stocks-double-5-083000739.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "06798c01-f858-31c5-8051-adae4d1c5871",
+    "content": {
+      "id": "06798c01-f858-31c5-8051-adae4d1c5871",
+      "contentType": "STORY",
+      "title": "President Donald Trump Claims Fuel Prices Will Drop \"Quickly\" When the U.S. Wins the Iran War, but He's Completely Missing the Bigger Picture",
+      "description": "",
+      "summary": "Regardless of when the Iran war ends, the inflationary damage has already been done.",
+      "pubDate": "2026-09-17T08:26:01Z",
+      "displayTime": "2026-09-17T08:26:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/d3bc7c7e40e5e91f4b3267a5029dd02a.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "Donald Trump speaking with reporters from the South Lawn of the White House.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/9y_Mc5YQEebO_iXChXY3Dg--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/d3bc7c7e40e5e91f4b3267a5029dd02a.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Wjvun_j7GsViL3SOOh5emw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/d3bc7c7e40e5e91f4b3267a5029dd02a.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/donald-trump-claims-fuel-prices-will-drop-quickly-when-iran-war-ends-but-completely-missing-bigger-picture/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/economy/articles/president-donald-trump-claims-fuel-082601457.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "567fab4d-2735-3a9a-a890-3a27321b9f64",
+    "content": {
+      "id": "567fab4d-2735-3a9a-a890-3a27321b9f64",
+      "contentType": "STORY",
+      "title": "Revolution Medicines Just Hit a Major Milestone. Is the Stock a Buy?",
+      "description": "",
+      "summary": "This company has succeeded where many others have failed.",
+      "pubDate": "2026-09-17T08:20:01Z",
+      "displayTime": "2026-09-17T08:20:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/f4ac1435cbb43ac188524f2bd79f7f64.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 787,
+        "caption": "Doctor giving patient medication. ",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/girmSzMmClfBu0F4.NTb4Q--~B/aD03ODc7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/f4ac1435cbb43ac188524f2bd79f7f64.jpg",
+            "width": 1400,
+            "height": 787,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/mGMBdgNP0WZ9T83awIJdDg--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/f4ac1435cbb43ac188524f2bd79f7f64.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/revolution-medicines-just-hit-a-major-milestone-is-the-stock-a-buy/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/healthcare/articles/revolution-medicines-just-hit-major-082001420.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "d3d04907-e545-3e59-96bd-88ec48e7f6aa",
+    "content": {
+      "id": "d3d04907-e545-3e59-96bd-88ec48e7f6aa",
+      "contentType": "STORY",
+      "title": "Anthropic Is Targeting a Valuation of Over $2 Trillion in Its IPO. Here's Why Smart Investors Will Wait Before Buying",
+      "description": "",
+      "summary": "History suggests waiting before buying IPO stocks.",
+      "pubDate": "2026-09-17T08:15:00Z",
+      "displayTime": "2026-09-17T08:15:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/f941c39ac716d448fbf325b61b7f268a.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 787,
+        "caption": "A computer chip with the letters \"AI\" on top of it.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/hADd2_Ks0R4bayecp.LdxQ--~B/aD03ODc7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/f941c39ac716d448fbf325b61b7f268a.jpg",
+            "width": 1400,
+            "height": 787,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/LgM4ezkUG5doKYN4LS6kYw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/f941c39ac716d448fbf325b61b7f268a.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/anthropic-target-valuation-2-trillion-smart-buy/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/anthropic-targeting-valuation-over-2-081500258.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "dd948e6a-df7e-39ac-9f49-46c9191ecfe7",
+    "content": {
+      "id": "dd948e6a-df7e-39ac-9f49-46c9191ecfe7",
+      "contentType": "STORY",
+      "title": "Netflix Stock Has Fallen 35% or More Before. History Says Every One of Those Drops Ended at a New High.",
+      "description": "",
+      "summary": "The streaming giant's stock has taken six declines of 35% or more before this one. Every round trip ended at a new high -- eventually.",
+      "pubDate": "2026-09-17T08:07:01Z",
+      "displayTime": "2026-09-17T08:07:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/a4215d4b530c4bbd4a277dd8e58d8e9f.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 840,
+        "caption": "A large Netflix sign on top of a building.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/cU8hZtBcPdB5nhsMwwaojA--~B/aD04NDA7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/a4215d4b530c4bbd4a277dd8e58d8e9f.jpg",
+            "width": 1400,
+            "height": 840,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/PL4zGvYejEchH4DFEqqoQw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/a4215d4b530c4bbd4a277dd8e58d8e9f.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/netflix-stock-has-fallen-35-or-more-before-history-says-every-one-of-those-drops-ended-at-a-new-high/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/netflix-stock-fallen-35-more-080701911.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "6c6bfda1-f8f1-374a-b786-daa845fab875",
+    "content": {
+      "id": "6c6bfda1-f8f1-374a-b786-daa845fab875",
+      "contentType": "STORY",
+      "title": "NVDA Stock In Focus As Huawei Announces 2 Advanced AI Chips For 2027",
+      "description": "",
+      "summary": "China\u2019s push for AI computing self-reliance is gaining momentum.",
+      "pubDate": "2026-09-17T07:44:49Z",
+      "displayTime": "2026-09-17T07:44:49Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/stocktwits_383/d7fd4baf5bf4b17d3fe4d60c9999af23.jpg",
+        "originalWidth": 1280,
+        "originalHeight": 656,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/5PGLatR24LhhPI3QLxkODg--~B/aD02NTY7dz0xMjgwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/stocktwits_383/d7fd4baf5bf4b17d3fe4d60c9999af23.jpg",
+            "width": 1280,
+            "height": 656,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/dce92g2gP96lFMZ.8u.BAw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/stocktwits_383/d7fd4baf5bf4b17d3fe4d60c9999af23.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Stocktwits",
+        "url": "Stocktwits",
+        "sourceId": "stocktwits_383"
+      },
+      "canonicalUrl": {
+        "url": "https://stocktwits.com/news-articles/markets/equity/nvda-stock-in-focus-as-huawei-announces-2-advanced-ai-chips-for-2027/cZtr0EKRB5h",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/nvda-stock-focus-huawei-announces-074449005.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "1bbfaece-2b26-3c1e-81a8-75f06e5b3e2d",
+    "content": {
+      "id": "1bbfaece-2b26-3c1e-81a8-75f06e5b3e2d",
+      "contentType": "STORY",
+      "title": "Tesla Gets Sucked Further Into China's Price War -- Here's Why It Will Succeed Anyway",
+      "description": "",
+      "summary": "Tesla is making a rare cut to its vehicle pricing in China, which could be the small boost it needs domestically to add to its export strategy.",
+      "pubDate": "2026-09-17T07:25:00Z",
+      "displayTime": "2026-09-17T07:25:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/18a8c322d76ffd8e5340d03a652b7a17.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 1050,
+        "caption": "Tesla Model 3 performance variant.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/PZx4ohE_kuigv8wZI.j0bw--~B/aD0xMDUwO3c9MTQwMDthcHBpZD15dGFjaHlvbg--/https://media.zenfs.com/en/motleyfool.com/18a8c322d76ffd8e5340d03a652b7a17.jpg",
+            "width": 1400,
+            "height": 1050,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/cRCUqEh2IBPAOxUSptzNvw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/18a8c322d76ffd8e5340d03a652b7a17.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/tesla-gets-sucked-further-into-chinas-price-war-he/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/tesla-gets-sucked-further-chinas-072500461.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "861b59b2-1893-3a74-938b-4323d1f5a38e",
+    "content": {
+      "id": "861b59b2-1893-3a74-938b-4323d1f5a38e",
+      "contentType": "STORY",
+      "title": "If the Stock Market Crashes, History Says This 1 Investing Move Has Never Once Failed",
+      "description": "",
+      "summary": "Recession fears are back, but history has promising news for investors.",
+      "pubDate": "2026-09-17T07:20:00Z",
+      "displayTime": "2026-09-17T07:20:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/2b9e6d369d1e9c9748568edc959ce47a.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "Silhouette of a bear against stock market charts.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/A3FQTcMlh4.MkCuMqAohBA--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/2b9e6d369d1e9c9748568edc959ce47a.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/rlbcljBmEsRWcrEstgsczA--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/2b9e6d369d1e9c9748568edc959ce47a.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/if-the-stock-market-crashes-history-says-this-1-in/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/stock-market-crashes-history-says-072000510.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "a54679f9-9665-3dbf-8b55-6ba5a36d2e81",
+    "content": {
+      "id": "a54679f9-9665-3dbf-8b55-6ba5a36d2e81",
+      "contentType": "STORY",
+      "title": "Zacks Earnings Trends Highlights: Micron  and Nvidia",
+      "description": "",
+      "summary": "Micron and Nvidia have been highlighted in this Earnings Trends article.",
+      "pubDate": "2026-09-17T07:01:00Z",
+      "displayTime": "2026-09-17T07:01:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/zacks.com/b40efcbfab527ad36d9e9706df6ddabb.jpg",
+        "originalWidth": 635,
+        "originalHeight": 400,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/0FQHZjqX3rwiDG6..jgaGg--~B/aD00MDA7dz02MzU7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/zacks.com/b40efcbfab527ad36d9e9706df6ddabb.jpg",
+            "width": 635,
+            "height": 400,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Qz5V5JJzIoCtecd3fkFq2A--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/zacks.com/b40efcbfab527ad36d9e9706df6ddabb.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Zacks",
+        "url": "http://www.zacks.com/",
+        "sourceId": "zacks.com"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/zacks-earnings-trends-highlights-micron-070100921.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/zacks-earnings-trends-highlights-micron-070100921.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "b1388358-e486-39e0-8028-da85bd54577a",
+    "content": {
+      "id": "b1388358-e486-39e0-8028-da85bd54577a",
+      "contentType": "STORY",
+      "title": "Leidos Just Closed a $2.4 Billion Grid-Infrastructure Acquisition. Is This a Quiet AI Winner?",
+      "description": "",
+      "summary": "Leidos' ENTRUST deal expands its grid expertise as data centers strain power supply. Here's what the numbers say about the stock now.",
+      "pubDate": "2026-09-17T06:50:00Z",
+      "displayTime": "2026-09-17T06:50:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/c098e0ce798b5d1cba945bf31dcd6212.jpg",
+        "originalWidth": 1200,
+        "originalHeight": 801,
+        "caption": "Power lines.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/QZL2nfc67NYD3GJimXWQlA--~B/aD04MDE7dz0xMjAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/c098e0ce798b5d1cba945bf31dcd6212.jpg",
+            "width": 1200,
+            "height": 801,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/s6ynWS19GwNzVCGlzrdk9Q--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/c098e0ce798b5d1cba945bf31dcd6212.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/leidos-just-closed-a-24-billion-grid-infrastructur/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/energy/articles/leidos-just-closed-2-4-065000826.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "a125b2a4-a9a2-3ad5-be55-61961d367ff2",
+    "content": {
+      "id": "a125b2a4-a9a2-3ad5-be55-61961d367ff2",
+      "contentType": "STORY",
+      "title": "Nvidia Has Returned $46 Billion to Shareholders This Year, and Another Major Dividend Hike Could Be Coming",
+      "description": "",
+      "summary": "The chipmaker is making more money than it could possibly put to work right now.",
+      "pubDate": "2026-09-17T06:25:00Z",
+      "displayTime": "2026-09-17T06:25:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/0bf877151d0b353c6723dd27f3f70502.png",
+        "originalWidth": 720,
+        "originalHeight": 456,
+        "caption": "NVDA Revenue (Quarterly) Chart",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Dem5ezprsTRrj9KbDKJIkQ--~B/aD00NTY7dz03MjA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/0bf877151d0b353c6723dd27f3f70502.png",
+            "width": 720,
+            "height": 456,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/PmS748p101NU8kO6ZFTAPg--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/0bf877151d0b353c6723dd27f3f70502.png",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/nvidia-has-returned-46-billion-to-shareholders-thi/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/nvidia-returned-46-billion-shareholders-062500026.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "6e8d562d-374f-33bf-8b67-ca806797ca08",
+    "content": {
+      "id": "6e8d562d-374f-33bf-8b67-ca806797ca08",
+      "contentType": "STORY",
+      "title": "SpaceX's First Orbital Starship Flight Is Targeted for Sept. 22. Here's What's Riding on It for the Stock.",
+      "description": "",
+      "summary": "Starship's 14th test flight would be its first try at orbit -- and its first with a payload that makes money.",
+      "pubDate": "2026-09-17T05:53:01Z",
+      "displayTime": "2026-09-17T05:53:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/5ba5e2374ee0f37f9b3c63dc393833f8.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "A Starship-style rocket fires its engines in space beside a blue planet.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/RZ..p.4tjgExv4Gfm0JgrA--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/5ba5e2374ee0f37f9b3c63dc393833f8.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/1G90gR_Aj2AiUXBJc_l22w--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/5ba5e2374ee0f37f9b3c63dc393833f8.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/spacex-s-first-orbital-starship-flight-is-targeted-for-sept-22-here-s-what-s-riding-on-it-for-the-stock/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/spacexs-first-orbital-starship-flight-055301744.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "bbaa4205-0e0b-32c8-b4f1-4d786f008afe",
+    "content": {
+      "id": "bbaa4205-0e0b-32c8-b4f1-4d786f008afe",
+      "contentType": "STORY",
+      "title": "Markel Is Built Like a Smaller Berkshire Hathaway. Its Stock Sits 18% Below Its 52-Week High.",
+      "description": "",
+      "summary": "Markel doesn't hide its aspiration to be the next Berkshire Hathaway, but is the current drawdown a buying opportunity?",
+      "pubDate": "2026-09-17T05:35:00Z",
+      "displayTime": "2026-09-17T05:35:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/2a23366a769db921d0d0b36641467286.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "A parent and a child making muscles together.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/74BVqZWDkDiKyT.JTlUhJg--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/2a23366a769db921d0d0b36641467286.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/__f3pfRhDZ.7nWPtPXToCw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/2a23366a769db921d0d0b36641467286.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/markel-is-built-like-a-smaller-berkshire-hathaway/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/markel-built-smaller-berkshire-hathaway-053500894.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "6a31d743-354f-30f9-80aa-c73f4929b9d7",
+    "content": {
+      "id": "6a31d743-354f-30f9-80aa-c73f4929b9d7",
+      "contentType": "STORY",
+      "title": "If the Pace of AI Is Slowed, Investors Can Turn to Quantum Computing. 4 Quantum Stocks to Buy Now.",
+      "description": "",
+      "summary": "These four quantum stocks are leading the way in the space.",
+      "pubDate": "2026-09-17T04:20:00Z",
+      "displayTime": "2026-09-17T04:20:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/84e31523d36a6ea3c6cf6f24535299c3.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 807,
+        "caption": "The words \"Quantum Computing\" against a futuristic background.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/awFJXgLrSfETrVyG99fIaA--~B/aD04MDc7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/84e31523d36a6ea3c6cf6f24535299c3.jpg",
+            "width": 1400,
+            "height": 807,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/LGIsE3uz3N597WMu5xRCIg--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/84e31523d36a6ea3c6cf6f24535299c3.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/17/if-the-pace-of-ai-is-slowed-investors-can-turn-to/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/pace-ai-slowed-investors-turn-042000095.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "52ab1180-a319-39df-a24a-203d8a6d1c86",
+    "content": {
+      "id": "52ab1180-a319-39df-a24a-203d8a6d1c86",
+      "contentType": "STORY",
+      "title": "Salesforce Unveils AIforce, Expands Agentforce at Dreamforce",
+      "description": "",
+      "summary": "Salesforce (NYSE:CRM) used its Dreamforce keynote to outline an expanded artificial intelligence strategy centered on \u201cAIforce,\u201d a platform the company said is designed to combine enterprise data, applications, AI agents and new interfaces. The company described AIforce as a way to connect probabil",
+      "pubDate": "2026-09-17T04:02:00Z",
+      "displayTime": "2026-09-17T04:02:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/marketbeat_955/6df97ebe521da9f40c671b4499acfdf2.png",
+        "originalWidth": 1200,
+        "originalHeight": 675,
+        "caption": "Salesforce logo",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/5Kd1aJOnErRKgPvESctiWg--~B/aD02NzU7dz0xMjAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/marketbeat_955/6df97ebe521da9f40c671b4499acfdf2.png",
+            "width": 1200,
+            "height": 675,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/wxwJMgfkJgITFp0tpGY5Ug--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/marketbeat_955/6df97ebe521da9f40c671b4499acfdf2.png",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "MarketBeat",
+        "url": "https://www.marketbeat.com/",
+        "sourceId": "marketbeat_955"
+      },
+      "canonicalUrl": {
+        "url": "https://www.marketbeat.com/instant-alerts/event-salesforce-unveils-aiforce-expands-agentforce-at-dreamforce-2026-09-16/?utm_source=yahoofinance&utm_medium=yahoofinance",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/salesforce-unveils-aiforce-expands-agentforce-040200094.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "91911fa3-76fc-3420-982f-44689c5b4750",
+    "content": {
+      "id": "91911fa3-76fc-3420-982f-44689c5b4750",
+      "contentType": "STORY",
+      "title": "Snowflake Surging to All-Time Highs",
+      "description": "",
+      "summary": "Snowflake stock is surging toward all-time highs after reporting its latest quarterly earnings.",
+      "pubDate": "2026-09-17T03:43:21Z",
+      "displayTime": "2026-09-17T03:43:21Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/c7d8251f28f47025b2577eafce9d7025.jpg",
+        "originalWidth": 800,
+        "originalHeight": 450,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/XX6TCfQh5.YKktOo0MDolQ--~B/aD00NTA7dz04MDA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/c7d8251f28f47025b2577eafce9d7025.jpg",
+            "width": 800,
+            "height": 450,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/dP4s3ObPjea5o.QIhjgc2w--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/c7d8251f28f47025b2577eafce9d7025.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/snowflake-surging-to-all-time-highs/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/snowflake-surging-time-highs-034321952.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "ac5373c6-7ff1-336f-a998-64c33161944b",
+    "content": {
+      "id": "ac5373c6-7ff1-336f-a998-64c33161944b",
+      "contentType": "STORY",
+      "title": "China's Huawei sets 2027 launch for new AI chips as it targets Nvidia",
+      "description": "",
+      "summary": "By Che Pan, Casey Hall and Eduardo Baptista SHANGHAI/BEIJING Sept 17 (Reuters) - Huawei Technologies will launch two new artificial-intelligence semiconductors in 2027, rotating chairman David Wang said on Thursday, as the Chinese \u200ctech giant builds up its AI computing business and seeks to challenge U. Huawei plans \u200cto launch the 960DT in the first quarter of 2027 and the Ascend 960PR in the third quarter, Wang said.",
+      "pubDate": "2026-09-17T03:33:59Z",
+      "displayTime": "2026-09-17T03:33:59Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/reuters.com/a81e7692551e24ad8b8206f7d57d9fb6.jpg",
+        "originalWidth": 800,
+        "originalHeight": 533,
+        "caption": "FILE PHOTO: The Huawei logo at the World Artificial Intelligence Conference (WAIC) in Shanghai, China, July 17, 2026. REUTERS/Go Nakamura/File Photo",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/1g9qHhqGfVujqisq542IcQ--~B/aD01MzM7dz04MDA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/reuters.com/a81e7692551e24ad8b8206f7d57d9fb6.jpg",
+            "width": 800,
+            "height": 533,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/jQnocm7_mVHo7z6dpuMQqw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/reuters.com/a81e7692551e24ad8b8206f7d57d9fb6.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Reuters",
+        "url": "https://www.reuters.com/",
+        "sourceId": "reuters.com"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/news/chinas-huawei-launch-two-ai-024013563.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/news/chinas-huawei-launch-two-ai-024013563.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "be93b320-8ec6-34f7-8fd1-30c0d2439048",
+    "content": {
+      "id": "be93b320-8ec6-34f7-8fd1-30c0d2439048",
+      "contentType": "STORY",
+      "title": "The Competition's Response to Tesla Robotaxi Day",
+      "description": "",
+      "summary": "Tesla hosted a robotaxi day nearly two years after the robotaxi was first announced.",
+      "pubDate": "2026-09-17T03:31:00Z",
+      "displayTime": "2026-09-17T03:31:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/0984f5caa00f729c74db92639c40ef33.jpg",
+        "originalWidth": 800,
+        "originalHeight": 450,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/2g6cTEu1bpadcD0_8XfWrQ--~B/aD00NTA7dz04MDA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/0984f5caa00f729c74db92639c40ef33.jpg",
+            "width": 800,
+            "height": 450,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/mXb8SlrBfKkuzse.FTRVag--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/0984f5caa00f729c74db92639c40ef33.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/the-competition-s-response-to-tesla-robotaxi-day/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/competitions-response-tesla-robotaxi-day-033100552.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "21514060-653b-337c-b4eb-9908cd878a68",
+    "content": {
+      "id": "21514060-653b-337c-b4eb-9908cd878a68",
+      "contentType": "STORY",
+      "title": "Trump Compares AI Data Centers To Oil Boom \u2014 Nvidia CEO Agrees",
+      "description": "",
+      "summary": "The AI trade may be about to grow far beyond GPUs. At the All-In Summit, President Donald Trump called data centers \"the oil of the next 20\u201325 years,\" arguing that they are making states and communities wealthy. Data proves otherwise....",
+      "pubDate": "2026-09-17T03:30:07Z",
+      "displayTime": "2026-09-17T03:30:07Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/benzinga_79/4576b4c47fdb8d4a38a33548a481d64f.jpg",
+        "originalWidth": 1920,
+        "originalHeight": 1080,
+        "caption": "BRUSSELS, BELGIUM. 12th July 2018. Donald Trump, President of United States of America, during press conference at NATO SUMMIT 2018.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/RxvqeHeSS5SJzk6FpqxXPA--~B/aD0xMDgwO3c9MTkyMDthcHBpZD15dGFjaHlvbg--/https://media.zenfs.com/en/benzinga_79/4576b4c47fdb8d4a38a33548a481d64f.jpg",
+            "width": 1920,
+            "height": 1080,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/0gVU9GX99Sz8eAW0knZsug--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/benzinga_79/4576b4c47fdb8d4a38a33548a481d64f.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Benzinga",
+        "url": "https://www.benzinga.com/",
+        "sourceId": "benzinga_79"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/trump-compares-ai-data-centers-033007792.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/trump-compares-ai-data-centers-033007792.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "f8487216-ffda-3da2-a123-55d9aced9e6b",
+    "content": {
+      "id": "f8487216-ffda-3da2-a123-55d9aced9e6b",
+      "contentType": "STORY",
+      "title": "Old, New, Borrowed & Blue, Vol. 11",
+      "description": "",
+      "summary": "This episode's hodgepodge theme is something old, something new, something borrowed, something blue.",
+      "pubDate": "2026-09-17T03:20:22Z",
+      "displayTime": "2026-09-17T03:20:22Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/3ab654f5734c912254b589a711f264d2.jpg",
+        "originalWidth": 800,
+        "originalHeight": 450,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/VBQmUiHNVHr5e8_mO6164g--~B/aD00NTA7dz04MDA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/3ab654f5734c912254b589a711f264d2.jpg",
+            "width": 800,
+            "height": 450,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/xAuNg7FDcDKcv.XyQ6qgKg--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/3ab654f5734c912254b589a711f264d2.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/old-new-borrowed-blue-vol-11/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/old-borrowed-blue-vol-11-032022459.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "8a2e035c-9bf3-3c27-92e5-877a3ea9d362",
+    "content": {
+      "id": "8a2e035c-9bf3-3c27-92e5-877a3ea9d362",
+      "contentType": "STORY",
+      "title": "NBIS Stock Rallies As Neocloud Operator Hikes Prices; Peers IREN, CRWV Jump As Well",
+      "description": "",
+      "summary": "The move points to robust AI infrastructure demand as operators expand capacity.",
+      "pubDate": "2026-09-17T03:10:55Z",
+      "displayTime": "2026-09-17T03:10:55Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/stocktwits_383/d4abf9e52125c2a53dc149ba9037aba7",
+        "originalWidth": 1280,
+        "originalHeight": 853,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/2FhNCMtrzm5Tkgod_q74cA--~B/aD04NTM7dz0xMjgwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/stocktwits_383/d4abf9e52125c2a53dc149ba9037aba7",
+            "width": 1280,
+            "height": 853,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/R9AEeN_oHRlmPynOCa.U9A--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/stocktwits_383/d4abf9e52125c2a53dc149ba9037aba7",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Stocktwits",
+        "url": "Stocktwits",
+        "sourceId": "stocktwits_383"
+      },
+      "canonicalUrl": {
+        "url": "https://stocktwits.com/news-articles/markets/equity/nbis-stock-rallies-as-neocloud-operator-hikes-prices-peers-iren-crwv-jump-as-well/cZtrBwmRB5R",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/nbis-stock-rallies-neocloud-operator-031055938.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "4e747020-c7a8-3ddd-83c1-7d12617fda55",
+    "content": {
+      "id": "4e747020-c7a8-3ddd-83c1-7d12617fda55",
+      "contentType": "STORY",
+      "title": "2 Midstream Dividend Stocks Nobody's Talking About Right Now",
+      "description": "",
+      "summary": "If you are looking for high-yield stocks, consider stepping beyond the \"obvious\" names in the midstream sector.",
+      "pubDate": "2026-09-17T02:35:00Z",
+      "displayTime": "2026-09-17T02:35:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/067a1bf0c3dafd5d3c9197d3ed669a13.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "A person in protective gear welding an energy pipeline.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/_Y2ZeoCbn.1R_pbhGgYmEA--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/067a1bf0c3dafd5d3c9197d3ed669a13.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/mwXBTzk.MfEdAwyxVuSiHA--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/067a1bf0c3dafd5d3c9197d3ed669a13.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/2-midstream-dividend-stocks-nobodys-talking-about/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/energy/articles/2-midstream-dividend-stocks-nobodys-023500381.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "200d3308-6d36-3e51-bc6e-ade6c0709163",
+    "content": {
+      "id": "200d3308-6d36-3e51-bc6e-ade6c0709163",
+      "contentType": "STORY",
+      "title": "Chamath Called Nvidia the \u2018Bank of AI\u2019\u2014and Jensen Huang Just Proved It",
+      "description": "",
+      "summary": "Nvidia Corp is no longer just selling the picks and shovels of the AI boom. It is increasingly helping figure out who gets the money, infrastructure and computing power needed to build the next phase of it\u2014which may explain why...",
+      "pubDate": "2026-09-17T02:30:07Z",
+      "displayTime": "2026-09-17T02:30:07Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/benzinga_79/7d8849b77157d121548e7b300d1078ee.jpg",
+        "originalWidth": 1920,
+        "originalHeight": 1080,
+        "caption": "LOS ANGELES - APR 15: Chamath Palihapitiya at the 9th Breakthrough Prize Ceremony Arrivals at the Academy Museum of Motion Pictures on April 15, 2023 in Los Angeles, CA",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/tsdCxBaNBjpHA0_pxohnow--~B/aD0xMDgwO3c9MTkyMDthcHBpZD15dGFjaHlvbg--/https://media.zenfs.com/en/benzinga_79/7d8849b77157d121548e7b300d1078ee.jpg",
+            "width": 1920,
+            "height": 1080,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/FVt6Kbhlf0VUnyeuiAdMdQ--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/benzinga_79/7d8849b77157d121548e7b300d1078ee.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Benzinga",
+        "url": "https://www.benzinga.com/",
+        "sourceId": "benzinga_79"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/chamath-called-nvidia-bank-ai-023007019.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/chamath-called-nvidia-bank-ai-023007019.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "02183d96-6103-30f1-bb69-4f63b6fab7f1",
+    "content": {
+      "id": "02183d96-6103-30f1-bb69-4f63b6fab7f1",
+      "contentType": "STORY",
+      "title": "Why Forgent Power Stock Keeps Going Up",
+      "description": "",
+      "summary": "The electrical infrastructure builder could be your way to profit from the AI race.",
+      "pubDate": "2026-09-17T01:50:07Z",
+      "displayTime": "2026-09-17T01:50:07Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/678e5ec6a665e398ffef9b4fd58a6f83.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 787,
+        "caption": "A person is smiling while working in an AI data center. ",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/pDoDPiVctbOPgNQ04xJAGA--~B/aD03ODc7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/678e5ec6a665e398ffef9b4fd58a6f83.jpg",
+            "width": 1400,
+            "height": 787,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/lMsj3NMgK76izoIyP.PYJQ--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/678e5ec6a665e398ffef9b4fd58a6f83.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/why-forgent-power-stock-keeps-going-up/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/why-forgent-power-stock-keeps-015007577.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "59948a60-e367-3020-8595-45366b2e69c0",
+    "content": {
+      "id": "59948a60-e367-3020-8595-45366b2e69c0",
+      "contentType": "STORY",
+      "title": "Micron vs. Sandisk: Which AI Memory Stock Benefits More From Nvidia's $279 Billion Warning?",
+      "description": "",
+      "summary": "Memory has become a binding constraint for artificial intelligence (AI) data center build-outs.",
+      "pubDate": "2026-09-17T01:41:00Z",
+      "displayTime": "2026-09-17T01:41:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/1bf500999071cd5b6cfbb5371714657c.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "Person looking at computer.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/M2CajCB2HwVeHhZGLtl2Bw--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/1bf500999071cd5b6cfbb5371714657c.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/wioVTh1gqhLmzMaegmw6hw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/1bf500999071cd5b6cfbb5371714657c.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/micron-vs-sandisk-which-ai-memory-stock-benefits/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/micron-vs-sandisk-ai-memory-014100496.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "08765731-5ce0-3e2a-bd47-7d1a5992d267",
+    "content": {
+      "id": "08765731-5ce0-3e2a-bd47-7d1a5992d267",
+      "contentType": "STORY",
+      "title": "Vistra vs. Constellation vs. Talen Energy: Which Nuclear-Heavy Stock Is the Better AI-Power Bet?",
+      "description": "",
+      "summary": "AI data centers are driving enormous demand for reliable, around-the-clock electricity, and these companies provide it.",
+      "pubDate": "2026-09-17T01:25:00Z",
+      "displayTime": "2026-09-17T01:25:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/154f70562b5875430293a97f54a04801.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "A person in a hard hat at a power plant looks at a cooling tower in the background. ",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/.5GiSKzm3AytTIGebN0u1A--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/154f70562b5875430293a97f54a04801.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Yo8kwzpbwm3ji7rmcxW2dQ--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/154f70562b5875430293a97f54a04801.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/vistra-vs-constellation-vs-talen-energy-which-nucl/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/energy/articles/vistra-vs-constellation-vs-talen-012500911.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "ef111e80-b6a3-37ce-beca-b89b46da1e3b",
+    "content": {
+      "id": "ef111e80-b6a3-37ce-beca-b89b46da1e3b",
+      "contentType": "STORY",
+      "title": "This Ethereum Treasury Company Is Close to Owning 5% of All ETH in Circulation. Does That Make It a Buy?",
+      "description": "",
+      "summary": "BitMine continues to buy Ethereum at a rapid clip, but where's the payoff for investors?",
+      "pubDate": "2026-09-17T01:01:00Z",
+      "displayTime": "2026-09-17T01:01:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/3e5115867eada65d841253c1d4378206.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 831,
+        "caption": "Investor analyzing Ethereum on a tablet.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/QJE4ETED8YoRsEAuhO8qsQ--~B/aD04MzE7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/3e5115867eada65d841253c1d4378206.jpg",
+            "width": 1400,
+            "height": 831,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/JPr0MEHRc1bm9W_y3jaeJw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/3e5115867eada65d841253c1d4378206.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/is-this-ethereum-treasury-company-a-buy/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/crypto/articles/ethereum-treasury-company-close-owning-010100563.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "3a108b7c-89df-35cb-88ed-b18e2b318eeb",
+    "content": {
+      "id": "3a108b7c-89df-35cb-88ed-b18e2b318eeb",
+      "contentType": "STORY",
+      "title": "More Than a Quarter of Nvidia's Revenue Now Comes From Customers Based in Taiwan. Should Investors Be Worried?",
+      "description": "",
+      "summary": "The second-biggest line in the chip giant's latest filing likely belongs to companies buying for someone else.",
+      "pubDate": "2026-09-17T00:54:01Z",
+      "displayTime": "2026-09-17T00:54:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/4807d7979d114e5e5701122b50c1cb4b.png",
+        "originalWidth": 1400,
+        "originalHeight": 840,
+        "caption": "Green industrial robotic arm beside a conveyor belt in an automated factory.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Yf.d0f.dYw.xYX27Nq6YlQ--~B/aD04NDA7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/4807d7979d114e5e5701122b50c1cb4b.png",
+            "width": 1400,
+            "height": 840,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Of.MdXIiHdSQYt_pDVSQ2g--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/4807d7979d114e5e5701122b50c1cb4b.png",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/more-than-a-quarter-of-nvidia-s-revenue-now-comes-from-customers-based-in-taiwan-should-investors-be-worried/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/more-quarter-nvidias-revenue-now-005401979.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "462ecfa4-8398-3586-b491-c5edd9f04d9a",
+    "content": {
+      "id": "462ecfa4-8398-3586-b491-c5edd9f04d9a",
+      "contentType": "STORY",
+      "title": "Is It Too Early To Buy Marvell Stock After Its Three-Month Fall?",
+      "description": "",
+      "summary": "Marvell Technology (MRVL) has more than tripled over the past year. It has also fallen about 28% in three months and trades about 30% below its 52-week high. If you are wondering whether the growth story broke, it did not. Marvell raised its revenue guidance on August 27, 2026, and the stock fell anyway.",
+      "pubDate": "2026-09-17T00:51:58Z",
+      "displayTime": "2026-09-17T00:51:58Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/trefis_142/326f4f70d68e9eceba6f8161f01b98dd.jpg",
+        "originalWidth": 1280,
+        "originalHeight": 1265,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/D4WjgzuA9.zWFQEYsT49_g--~B/aD0xMjY1O3c9MTI4MDthcHBpZD15dGFjaHlvbg--/https://media.zenfs.com/en/trefis_142/326f4f70d68e9eceba6f8161f01b98dd.jpg",
+            "width": 1280,
+            "height": 1265,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/vQwabXDWlX31RttxJEsvww--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/trefis_142/326f4f70d68e9eceba6f8161f01b98dd.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Trefis",
+        "url": "https://www.trefis.com/",
+        "sourceId": "trefis_142"
+      },
+      "canonicalUrl": {
+        "url": "https://www.trefis.com/articles/615545/is-it-too-early-to-buy-marvell-stock-after-its-three-month-fall/2026-09-16",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/too-early-buy-marvell-stock-005158674.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "dc4dd700-68de-3c9b-a3de-bf5e66edb2c0",
+    "content": {
+      "id": "dc4dd700-68de-3c9b-a3de-bf5e66edb2c0",
+      "contentType": "STORY",
+      "title": "Jensen Huang Says Hyperscalers Get This \u2018Almost Always Wrong\u2019 \u2014 Nvidia Has a Workaround",
+      "description": "",
+      "summary": "The biggest AI infrastructure players may have a planning problem. NVIDIA Corp\u2018s CEO Jensen Huang says hyperscalers are \"always almost wrong\" because they plan capacity once a year while AI demand is changing too quickly to fit an annual calendar....",
+      "pubDate": "2026-09-17T00:30:32Z",
+      "displayTime": "2026-09-17T00:30:32Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/benzinga_79/c06b8cc1373b501020f2162899b6a60b.jpg",
+        "originalWidth": 1920,
+        "originalHeight": 1080,
+        "caption": "Taipei, Taiwan on June 1, 2023 : Jen-Hsun Huang (Jensen Huang) NVIDIA's Founder, President and CEO delivered a keynote speech at Computex Taipei.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/CVyyUVeX4bn6ImEbazCYkA--~B/aD0xMDgwO3c9MTkyMDthcHBpZD15dGFjaHlvbg--/https://media.zenfs.com/en/benzinga_79/c06b8cc1373b501020f2162899b6a60b.jpg",
+            "width": 1920,
+            "height": 1080,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/OE7oE533pAP5BodPRPSaPQ--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/benzinga_79/c06b8cc1373b501020f2162899b6a60b.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Benzinga",
+        "url": "https://www.benzinga.com/",
+        "sourceId": "benzinga_79"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/jensen-huang-says-hyperscalers-almost-003032752.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/jensen-huang-says-hyperscalers-almost-003032752.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "d9c9e204-0841-333f-94df-039c8627aaa0",
+    "content": {
+      "id": "d9c9e204-0841-333f-94df-039c8627aaa0",
+      "contentType": "STORY",
+      "title": "Why IREN (IREN) Is Down 6.1% After Nvidia Strikes US$5.5 Billion AI Cloud Deal With Miner",
+      "description": "",
+      "summary": "Recently, JPMorgan analyst Richard Choe issued a rare double-upgrade on IREN after the company signed a roughly US$5.50 billion, five-year partnership with Nvidia tied to its fast-growing AI cloud services platform. This shift, alongside IREN's decision to wind down Bitcoin mining and expand vertically integrated AI infrastructure, marks a material redefinition of its core business model. Next, we'll examine how the Nvidia partnership and AI cloud transition reshape IREN's investment...",
+      "pubDate": "2026-09-17T00:18:14Z",
+      "displayTime": "2026-09-17T00:18:14Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/simply_wall_st__316/43e1667cb7476cb45f84db58a8de8d48.jpg",
+        "originalWidth": 1600,
+        "originalHeight": 900,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/bB0wgzAdfpS5SrGstP94kw--~B/aD05MDA7dz0xNjAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/simply_wall_st__316/43e1667cb7476cb45f84db58a8de8d48.jpg",
+            "width": 1600,
+            "height": 900,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/DMX5XIy4RUOYFDGFws5Z0Q--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/simply_wall_st__316/43e1667cb7476cb45f84db58a8de8d48.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Simply Wall St.",
+        "url": "https://simplywall.st/",
+        "sourceId": "simply_wall_st__316"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/why-iren-iren-down-6-001814288.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/why-iren-iren-down-6-001814288.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "e4031c03-c30a-3230-b31b-842a9dbbde57",
+    "content": {
+      "id": "e4031c03-c30a-3230-b31b-842a9dbbde57",
+      "contentType": "STORY",
+      "title": "These 2 Words From Fed Chair Kevin Warsh Sunk the Dow, S&P 500, and Nasdaq, and Put Wall Street on Notice",
+      "description": "",
+      "summary": "The battle against persistently elevated inflation is just getting started.",
+      "pubDate": "2026-09-17T00:11:01Z",
+      "displayTime": "2026-09-17T00:11:01Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/ac454eaca91a4eaca7ddd8a0c3b60b9d.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 933,
+        "caption": "Kevin Warsh is delivering remarks to the press following the September Federal Open Market Committee Meeting.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/zGcmaouorooZpMQ8Tpg7Zg--~B/aD05MzM7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/ac454eaca91a4eaca7ddd8a0c3b60b9d.jpg",
+            "width": 1400,
+            "height": 933,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/bhqrRoxIrHvPJe0tNZVgJg--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/ac454eaca91a4eaca7ddd8a0c3b60b9d.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/these-2-words-from-fed-chair-kevin-warsh-sunk-dow-sp500-nasdaq-put-wall-street-on-notice/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/economy/policy/articles/2-words-fed-chair-kevin-001101303.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "3787fa3d-2edb-31d9-b7cb-4e4c36d9b8ec",
+    "content": {
+      "id": "3787fa3d-2edb-31d9-b7cb-4e4c36d9b8ec",
+      "contentType": "STORY",
+      "title": "Inside the White House Tussle to Sway Trump on AI",
+      "description": "",
+      "summary": "Senior administration officials have gathered almost daily in recent months to plot potential guardrails.",
+      "pubDate": "2026-09-17T00:00:00Z",
+      "displayTime": "2026-09-17T00:00:00Z",
+      "isHosted": false,
+      "bypassModal": false,
+      "previewUrl": "https://finance.yahoo.com/m/3787fa3d-2edb-31d9-b7cb-4e4c36d9b8ec/inside-the-white-house-tussle.html",
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/wsj.com/01249d64ebce9f39ef9f8182a0570613.jpg",
+        "originalWidth": 1280,
+        "originalHeight": 640,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/_24UZKmIpf5m6llqfFOLMw--~B/aD02NDA7dz0xMjgwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/wsj.com/01249d64ebce9f39ef9f8182a0570613.jpg",
+            "width": 1280,
+            "height": 640,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Vhj_VX6LFJSmaP30j0egrA--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/wsj.com/01249d64ebce9f39ef9f8182a0570613.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "The Wall Street Journal",
+        "url": "http://www.wsj.com/",
+        "sourceId": "wsj.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.wsj.com/tech/ai/inside-the-white-house-tussle-to-sway-trump-on-ai-0043d567?siteid=yhoof2&yptr=yahoo",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": null,
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "0f6b575e-5a53-3af2-877c-19075a202071",
+    "content": {
+      "id": "0f6b575e-5a53-3af2-877c-19075a202071",
+      "contentType": "STORY",
+      "title": "Why GE Vernova Stock Crushed it on Wednesday",
+      "description": "",
+      "summary": "There was notable progress in a Texas power plant project that the company will supply.",
+      "pubDate": "2026-09-16T23:56:02Z",
+      "displayTime": "2026-09-16T23:56:02Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/motleyfool.com/c8246c9f2dcd791e5c0ba596363914c0.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 787,
+        "caption": "A nuclear power plant photographed in the daytime.",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/rmEfENZ3WzEkVo_7.nSTQQ--~B/aD03ODc7dz0xNDAwO2FwcGlkPXl0YWNoeW9u/https://media.zenfs.com/en/motleyfool.com/c8246c9f2dcd791e5c0ba596363914c0.jpg",
+            "width": 1400,
+            "height": 787,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/Trm7i6tdXvqGtBqMUHeEsw--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/motleyfool.com/c8246c9f2dcd791e5c0ba596363914c0.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Motley Fool",
+        "url": "http://www.fool.com/",
+        "sourceId": "motleyfool.com"
+      },
+      "canonicalUrl": {
+        "url": "https://www.fool.com/investing/2026/09/16/why-ge-vernova-stock-crushed-it-on-wednesday/",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/markets/stocks/articles/why-ge-vernova-stock-crushed-235602049.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "0e4b4b61-05d6-363f-904f-92d88c43735a",
+    "content": {
+      "id": "0e4b4b61-05d6-363f-904f-92d88c43735a",
+      "contentType": "STORY",
+      "title": "Snap targets enterprises with Salesforce, Nvidia AI tools for augmented-reality glasses",
+      "description": "",
+      "summary": "Sept 16 (Reuters) - Snap on Wednesday announced partnerships with companies including Salesforce, Nvidia and Amazon Web Services to integrate workplace tools into its Specs augmented-reality glasses,",
+      "pubDate": "2026-09-16T23:45:12Z",
+      "displayTime": "2026-09-16T23:45:12Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.zenfs.com/en/reuters.com/d6c0f5f60e9f69c905c758582d1df18b.jpg",
+        "originalWidth": 800,
+        "originalHeight": 540,
+        "caption": "FILE PHOTO: Snapchat logo is seen in this illustration taken July 28, 2022. REUTERS/Dado Ruvic/Illustration/File Photo",
+        "resolutions": [
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/CKT_1AdOO.2Y8UhKJCGKag--~B/aD01NDA7dz04MDA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/reuters.com/d6c0f5f60e9f69c905c758582d1df18b.jpg",
+            "width": 800,
+            "height": 540,
+            "tag": "original"
+          },
+          {
+            "url": "https://s.yimg.com/uu/api/res/1.2/zNxJ52H1BP23E2S4J_K_Yg--~B/Zmk9c3RyaW07aD0xMjg7dz0xNzA7YXBwaWQ9eXRhY2h5b24-/https://media.zenfs.com/en/reuters.com/d6c0f5f60e9f69c905c758582d1df18b.jpg",
+            "width": 170,
+            "height": 128,
+            "tag": "170x128"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Reuters",
+        "url": "https://www.reuters.com/",
+        "sourceId": "reuters.com"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/snap-targets-enterprises-salesforce-nvidia-234512914.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.yahoo.com/technology/ai/articles/snap-targets-enterprises-salesforce-nvidia-234512914.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  }
+]
