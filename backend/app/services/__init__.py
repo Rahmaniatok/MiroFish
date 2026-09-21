@@ -63,6 +63,15 @@ from .simulation_ipc import (
     CommandType,
     CommandStatus
 )
+from .metric_edge_builder import (
+    build_universe_seed,
+    compute_price_correlation_edges,
+    compute_fundamental_similarity_edges,
+    compute_sector_edges,
+    RELATION_PRICE_CORRELATED,
+    RELATION_FUNDAMENTALLY_SIMILAR,
+    RELATION_SAME_SECTOR,
+)
 
 __all__ = [
     'OntologyGenerator', 
@@ -121,5 +130,12 @@ __all__ = [
     'IPCResponse',
     'CommandType',
     'CommandStatus',
+    'build_universe_seed',
+    'compute_price_correlation_edges',
+    'compute_fundamental_similarity_edges',
+    'compute_sector_edges',
+    'RELATION_PRICE_CORRELATED',
+    'RELATION_FUNDAMENTALLY_SIMILAR',
+    'RELATION_SAME_SECTOR',
 ]
 
