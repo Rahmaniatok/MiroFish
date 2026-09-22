@@ -72,9 +72,12 @@ import multiprocessing
 import random
 import signal
 import sqlite3
+import time
 import warnings
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
+
+from openai import AsyncOpenAI
 
 
 # 全局变量：用于信号处理
@@ -1098,6 +1101,128 @@ class PlatformSimulation:
         self.total_actions = 0
 
 
+# 预热调用的最长等待时间（秒）。serverless 端点冷启动实测 2.5-3.7 分钟（RunPod）。
+WARMUP_TIMEOUT_SECONDS = 480
+
+
+def resolve_llm_endpoint(config: Dict[str, Any], use_boost: bool = False) -> Tuple[str, str, str]:
+    """
+    Resolve (api_key, base_url, model) exactly like create_model() does, without creating a model
+    or touching os.environ (so it is safe to call for the warm-up).
+    """
+    boost_api_key = os.environ.get("LLM_BOOST_API_KEY", "")
+    if use_boost and boost_api_key:
+        api_key = boost_api_key
+        base_url = os.environ.get("LLM_BOOST_BASE_URL", "")
+        model = os.environ.get("LLM_BOOST_MODEL_NAME", "") or os.environ.get("LLM_MODEL_NAME", "")
+    else:
+        api_key = os.environ.get("LLM_API_KEY", "")
+        base_url = os.environ.get("LLM_BASE_URL", "")
+        model = os.environ.get("LLM_MODEL_NAME", "")
+    if not model:
+        model = config.get("llm_model", "gpt-4o-mini")
+    return api_key, base_url, model
+
+
+async def warm_up_llm(
+    config: Dict[str, Any],
+    use_boost: bool = False,
+    label: str = "LLM",
+    main_logger: Optional[SimulationLogManager] = None,
+) -> bool:
+    """
+    One cheap chat completion against the simulation's LLM endpoint, so a serverless cold start is absorbed
+    BEFORE round 0 instead of inside the first round. It has no side effect on the simulation and is written
+    only to simulation.log (never to actions.jsonl). Any failure is a warning: warming up is a UX
+    optimisation, not a prerequisite, so the caller continues to round 0 regardless.
+    """
+    def log(msg: str):
+        if main_logger:
+            main_logger.info(f"[Warm-up] {msg}")
+        print(f"[Warm-up] {msg}")
+
+    api_key, base_url, model = resolve_llm_endpoint(config, use_boost)
+    if not api_key:
+        log(f"{label}: 缺少 API Key，跳过预热")
+        return False
+
+    log(f"{label}: 预热开始 model={model}, base_url={base_url[:40] if base_url else '默认'}...")
+    started = time.monotonic()
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url or None, timeout=WARMUP_TIMEOUT_SECONDS, max_retries=0)
+    try:
+        await asyncio.wait_for(
+            client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a health check."},
+                    {"role": "user", "content": "Reply with the single word: ok"},
+                ],
+            ),
+            timeout=WARMUP_TIMEOUT_SECONDS,
+        )
+    except Exception as e:
+        log(f"{label}: 预热失败（{time.monotonic() - started:.1f}秒），继续执行模拟: {type(e).__name__}: {e}")
+        return False
+    finally:
+        try:
+            await client.close()
+        except Exception:
+            pass
+    log(f"{label}: 预热完成，耗时 {time.monotonic() - started:.1f}秒")
+    return True
+
+
+async def warm_up_llms(
+    config: Dict[str, Any],
+    main_logger: Optional[SimulationLogManager] = None,
+    twitter: bool = True,
+    reddit: bool = True,
+) -> None:
+    """Warm up each distinct LLM endpoint the enabled platforms will use (Twitter: general, Reddit: boost)."""
+    targets = []
+    if twitter:
+        targets.append(("Twitter/通用LLM", False))
+    if reddit:
+        targets.append(("Reddit/加速LLM", True))
+    seen = {}
+    for label, use_boost in targets:
+        endpoint = resolve_llm_endpoint(config, use_boost)
+        if endpoint in seen:
+            seen[endpoint]["label"] += f" + {label}"     # same endpoint for both platforms: one call is enough
+        else:
+            seen[endpoint] = {"label": label, "use_boost": use_boost}
+    await asyncio.gather(*(
+        warm_up_llm(config, use_boost=t["use_boost"], label=t["label"], main_logger=main_logger)
+        for t in seen.values()
+    ))
+
+
+async def seed_complete_follow_network(env) -> int:
+    """
+    Round 0 seeding: every agent follows every other agent (complete directed graph, no self-follows;
+    N agents -> N*(N-1) edges) in ONE env.step of ManualAction(FOLLOW). The follow TABLE in the platform
+    database is what feeds/recsys read; agent_graph.add_edge only keeps the in-memory graph consistent,
+    because ManualAction does not touch it. Returns the number of follow edges requested.
+    """
+    agent_ids = sorted(agent_id for agent_id, _ in env.agent_graph.get_agents())
+    follow_actions = {}
+    for follower_id in agent_ids:
+        follower = env.agent_graph.get_agent(follower_id)
+        follow_actions[follower] = [
+            ManualAction(action_type=ActionType.FOLLOW, action_args={"followee_id": followee_id})
+            for followee_id in agent_ids if followee_id != follower_id
+        ]
+    edge_count = sum(len(actions) for actions in follow_actions.values())
+    if edge_count == 0:
+        return 0
+    await env.step(follow_actions)
+    for follower_id in agent_ids:
+        for followee_id in agent_ids:
+            if followee_id != follower_id:
+                env.agent_graph.add_edge(follower_id, followee_id)
+    return edge_count
+
+
 async def run_twitter_simulation(
     config: Dict[str, Any], 
     simulation_dir: str,
@@ -1176,7 +1301,28 @@ async def run_twitter_simulation(
     if action_logger:
         action_logger.log_round_start(0, 0)  # round 0, simulated_hour 0
     
-    initial_action_count = 0
+    # Only when the config asks for it (simulation_config.json -> social_graph.follow_network == "complete");
+    # any other config keeps the previous behaviour exactly.
+    follow_action_count = 0
+    if config.get("social_graph", {}).get("follow_network") == "complete":
+        follow_edges = await seed_complete_follow_network(result.env)
+        log_info(f"已建立完全图关注网络: {follow_edges} 条关注关系")
+        # Advance last_rowid past the follow actions and log them as round 0 (otherwise they would be
+        # re-read from the trace table and logged as round-1 actions).
+        follow_rows, last_rowid = fetch_new_actions_from_db(db_path, last_rowid, agent_names)
+        for action_data in follow_rows:
+            if action_logger:
+                action_logger.log_action(
+                    round_num=0,
+                    agent_id=action_data['agent_id'],
+                    agent_name=action_data['agent_name'],
+                    action_type=action_data['action_type'],
+                    action_args=action_data['action_args']
+                )
+                total_actions += 1
+                follow_action_count += 1
+    
+    initial_action_count = follow_action_count
     if initial_posts:
         initial_actions = {}
         for post in initial_posts:
@@ -1205,6 +1351,10 @@ async def run_twitter_simulation(
         if initial_actions:
             await result.env.step(initial_actions)
             log_info(f"已发布 {len(initial_actions)} 条初始帖子")
+    
+    # Bug fix: initial posts were already logged manually above, so move last_rowid past them. Without this the
+    # first loop round re-reads them from the trace table and logs them again as round-1 actions.
+    _, last_rowid = fetch_new_actions_from_db(db_path, last_rowid, agent_names)
     
     # 记录 round 0 结束
     if action_logger:
@@ -1367,7 +1517,28 @@ async def run_reddit_simulation(
     if action_logger:
         action_logger.log_round_start(0, 0)  # round 0, simulated_hour 0
     
-    initial_action_count = 0
+    # Only when the config asks for it (simulation_config.json -> social_graph.follow_network == "complete");
+    # any other config keeps the previous behaviour exactly.
+    follow_action_count = 0
+    if config.get("social_graph", {}).get("follow_network") == "complete":
+        follow_edges = await seed_complete_follow_network(result.env)
+        log_info(f"已建立完全图关注网络: {follow_edges} 条关注关系")
+        # Advance last_rowid past the follow actions and log them as round 0 (otherwise they would be
+        # re-read from the trace table and logged as round-1 actions).
+        follow_rows, last_rowid = fetch_new_actions_from_db(db_path, last_rowid, agent_names)
+        for action_data in follow_rows:
+            if action_logger:
+                action_logger.log_action(
+                    round_num=0,
+                    agent_id=action_data['agent_id'],
+                    agent_name=action_data['agent_name'],
+                    action_type=action_data['action_type'],
+                    action_args=action_data['action_args']
+                )
+                total_actions += 1
+                follow_action_count += 1
+    
+    initial_action_count = follow_action_count
     if initial_posts:
         initial_actions = {}
         for post in initial_posts:
@@ -1404,6 +1575,10 @@ async def run_reddit_simulation(
         if initial_actions:
             await result.env.step(initial_actions)
             log_info(f"已发布 {len(initial_actions)} 条初始帖子")
+    
+    # Bug fix: initial posts were already logged manually above, so move last_rowid past them. Without this the
+    # first loop round re-reads them from the trace table and logs them again as round-1 actions.
+    _, last_rowid = fetch_new_actions_from_db(db_path, last_rowid, agent_names)
     
     # 记录 round 0 结束
     if action_logger:
@@ -1569,6 +1744,10 @@ async def main():
     log_manager.info(f"  - Twitter动作: twitter/actions.jsonl")
     log_manager.info(f"  - Reddit动作: reddit/actions.jsonl")
     log_manager.info("=" * 60)
+    
+    # Absorb the LLM endpoint cold start before round 0 (outside the timed simulation). main() always builds a
+    # fresh simulation (databases are recreated above); this script has no resume path, so always warm up.
+    await warm_up_llms(config, log_manager, twitter=not args.reddit_only, reddit=not args.twitter_only)
     
     start_time = datetime.now()
     

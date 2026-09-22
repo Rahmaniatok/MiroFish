@@ -136,6 +136,20 @@ def _format_article_line(art: Dict[str, Any]) -> str:
     return " | ".join(parts)
 
 
+def _sample_articles_for_storage(sample: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Subset artikel sample yang disimpan di metadata run (headline sudah ada di memori; tanpa fetch baru)."""
+    return [
+        {
+            "article_id": a.get("article_id"),
+            "ticker": a.get("ticker"),
+            "headline": a.get("headline"),
+            "publisher": a.get("publisher"),
+            "published_at": a.get("published_at"),
+        }
+        for a in sample
+    ]
+
+
 def _grounding_for(sample: List[Dict[str, Any]]) -> str:
     return "news" if len(sample) >= MIN_ARTICLES_FOR_GROUNDING else "none"
 
@@ -436,6 +450,7 @@ def generate_personas(
     grounding = _grounding_for(sample)
     news_lines = [_format_article_line(a) for a in sample] if grounding == "news" else []
     article_ids = [a["article_id"] for a in sample] if grounding == "news" else []
+    sample_articles = _sample_articles_for_storage(sample) if grounding == "news" else []
     system_prompt, user_prompt = _build_persona_prompt(news_lines, grounding)
     if grounding == "none":
         logger.warning(f"grounding='none' (artikel sample={len(sample)} < {MIN_ARTICLES_FOR_GROUNDING})")
@@ -497,6 +512,7 @@ def generate_personas(
             "attempt": attempt + 1,
             "grounding": grounding,
             "article_ids": article_ids,
+            "sample_articles": sample_articles,
             "personas": [asdict(p) for p in personas],
             "warnings": warnings,
             "from_cache": False,
@@ -542,7 +558,8 @@ CREATE TABLE IF NOT EXISTS persona_runs (
     grounding TEXT NOT NULL,
     article_ids_json TEXT NOT NULL,
     personas_json TEXT NOT NULL,
-    warnings_json TEXT NOT NULL
+    warnings_json TEXT NOT NULL,
+    sample_json TEXT
 );
 """
 
@@ -585,6 +602,9 @@ def _connect() -> sqlite3.Connection:
         conn.execute("ALTER TABLE persona_runs ADD COLUMN universe_key TEXT NOT NULL DEFAULT ''")
     if "screening_json" not in cols:
         conn.execute("ALTER TABLE persona_runs ADD COLUMN screening_json TEXT NOT NULL DEFAULT '{}'")
+    if "sample_json" not in cols:
+        # Nullable: baris lama (sebelum kolom ini) dibaca sebagai sample_articles=[].
+        conn.execute("ALTER TABLE persona_runs ADD COLUMN sample_json TEXT")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_persona_runs_key ON persona_runs (as_of_key, universe_key, generated_at)"
     )
@@ -596,8 +616,8 @@ def _save_run(result: Dict[str, Any]) -> None:
     try:
         conn.execute(
             "INSERT INTO persona_runs (run_id, as_of_key, universe_key, screening_json, generated_at, "
-            "model, temperature_used, attempt, grounding, article_ids_json, personas_json, warnings_json) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            "model, temperature_used, attempt, grounding, article_ids_json, personas_json, warnings_json, "
+            "sample_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 result["run_id"], _as_of_key(result["as_of_date"]), result["universe_key"],
                 json.dumps(result["screening"]), result["generated_at"],
@@ -605,6 +625,7 @@ def _save_run(result: Dict[str, Any]) -> None:
                 result["grounding"], json.dumps(result["article_ids"]),
                 json.dumps(result["personas"], ensure_ascii=False),
                 json.dumps(result["warnings"], ensure_ascii=False),
+                json.dumps(result.get("sample_articles", []), ensure_ascii=False),
             ),
         )
         conn.commit()
@@ -618,7 +639,7 @@ def _load_latest_run(as_of_date: Optional[str], screening: Dict[str, Any]) -> Op
     try:
         row = conn.execute(
             "SELECT run_id, generated_at, model, temperature_used, attempt, grounding, "
-            "article_ids_json, personas_json, warnings_json FROM persona_runs "
+            "article_ids_json, personas_json, warnings_json, sample_json FROM persona_runs "
             "WHERE as_of_key = ? AND universe_key = ? ORDER BY generated_at DESC, rowid DESC LIMIT 1",
             (_as_of_key(as_of_date), universe_key),
         ).fetchone()
@@ -638,6 +659,8 @@ def _load_latest_run(as_of_date: Optional[str], screening: Dict[str, Any]) -> Op
         "attempt": row[4],
         "grounding": row[5],
         "article_ids": json.loads(row[6]),
+        # NULL (run lama sebelum kolom sample_json) -> [] : adapter memakai fallback "tanpa headline".
+        "sample_articles": json.loads(row[9]) if row[9] else [],
         "personas": json.loads(row[7]),
         "warnings": json.loads(row[8]),
         "from_cache": True,

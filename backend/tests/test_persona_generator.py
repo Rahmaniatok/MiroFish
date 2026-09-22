@@ -420,3 +420,87 @@ def test_empty_universe_without_error_continues_with_grounding_none(setup_genera
     res = pg.generate_personas("2025-06-30")
     assert res["success"] is True and res["grounding"] == "none"
     assert len(llm.calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Fase 11a: sample_articles (headline) disimpan di metadata run
+# ---------------------------------------------------------------------------
+
+_SAMPLE_KEYS = {"article_id", "ticker", "headline", "publisher", "published_at"}
+
+
+def test_generate_stores_sample_articles_with_expected_shape(setup_generate):
+    setup_generate([json.dumps(valid_payload())])
+    result = pg.generate_personas("2025-06-30")
+    assert result["success"] and result["grounding"] == "news"
+    samples = result["sample_articles"]
+    assert samples and len(samples) == len(result["article_ids"])
+    assert [s["article_id"] for s in samples] == result["article_ids"]
+    for s in samples:
+        assert set(s) == _SAMPLE_KEYS
+        assert s["ticker"].startswith("T") and s["headline"].startswith("H")
+        assert s["publisher"] == "Reuters" and s["published_at"].startswith("2025-06-")
+
+
+def test_sample_articles_roundtrip_through_persistence(setup_generate):
+    setup_generate([json.dumps(valid_payload())])
+    first = pg.get_or_generate_personas("2025-06-30")
+    second = pg.get_or_generate_personas("2025-06-30")
+    assert second["from_cache"] is True
+    assert second["sample_articles"] == first["sample_articles"] != []
+
+
+def test_sample_articles_empty_when_grounding_none(setup_generate):
+    setup_generate([json.dumps(valid_payload())], universe=make_universe(1), news={"T000": [art(1)]})
+    result = pg.generate_personas("2025-06-30")
+    assert result["grounding"] == "none"
+    assert result["sample_articles"] == [] and result["article_ids"] == []
+
+
+def _seed_pre_sample_json_db(persona_count=8):
+    """DB dengan skema SEBELUM kolom sample_json (universe_key/screening_json sudah ada)."""
+    import sqlite3
+    conn = sqlite3.connect(pg.PERSONA_DB_PATH)
+    conn.execute("""CREATE TABLE persona_runs (run_id TEXT PRIMARY KEY, as_of_key TEXT NOT NULL,
+        universe_key TEXT NOT NULL DEFAULT '', screening_json TEXT NOT NULL DEFAULT '{}',
+        generated_at TEXT NOT NULL, model TEXT NOT NULL, temperature_used REAL NOT NULL, attempt INTEGER NOT NULL,
+        grounding TEXT NOT NULL, article_ids_json TEXT NOT NULL, personas_json TEXT NOT NULL,
+        warnings_json TEXT NOT NULL)""")
+    screening = pg._screening_params(None, None)
+    conn.execute(
+        "INSERT INTO persona_runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("old-run", "2025-06-30", pg._universe_key(screening), json.dumps(screening), "2025-07-01T00:00:00+00:00",
+         "m", 1.0, 1, "news", "[1, 2, 3]",
+         json.dumps([persona_dict(i) for i in range(persona_count)]), "[]"),
+    )
+    conn.commit()
+    conn.close()
+
+
+def test_old_run_without_sample_json_is_readable_with_empty_sample_articles(setup_generate):
+    llm = setup_generate([])  # tidak boleh ada panggilan LLM
+    _seed_pre_sample_json_db()
+    result = pg.get_or_generate_personas("2025-06-30")
+    assert result["success"] and result["from_cache"] is True
+    assert result["run_id"] == "old-run"
+    assert result["sample_articles"] == []          # fallback "tanpa headline", bukan crash
+    assert result["article_ids"] == [1, 2, 3]
+    assert len(result["personas"]) == 8
+    assert llm.calls == []
+
+
+def test_sample_json_migration_preserves_existing_rows():
+    import sqlite3
+    _seed_pre_sample_json_db()
+    conn = pg._connect()   # menjalankan migrasi
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(persona_runs)")}
+        assert "sample_json" in cols
+        row = conn.execute(
+            "SELECT run_id, universe_key, article_ids_json, sample_json FROM persona_runs").fetchone()
+    finally:
+        conn.close()
+    assert row[0] == "old-run" and row[2] == "[1, 2, 3]"
+    assert row[1] == pg._universe_key(pg._screening_params(None, None))   # data lama tidak berubah
+    assert row[3] is None
+    pg._connect().close()   # migrasi idempoten (kolom sudah ada -> tidak error)
