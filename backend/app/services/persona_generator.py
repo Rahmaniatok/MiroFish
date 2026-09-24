@@ -75,6 +75,17 @@ class InvestorPersona:
     short_bio: Optional[str] = None
 
 
+@dataclass
+class GroundingResult:
+    """Hasil builder grounding (Tahap 4, docs/design/tahap4_persona_from_graph_design.md
+    §1) — bentuk SAMA PERSIS dari kedua sumber (`build_grounding_from_news`/
+    `build_grounding_from_graph`), isi `provenance` beda per sumber (§5)."""
+    news_lines: List[str]
+    grounding: str   # "news" | "zep_graph" | "none" -- dipakai _build_persona_prompt
+    source: str      # "news" | "zep_graph" -- SELALU sumber builder, walau grounding=="none"
+    provenance: Dict[str, Any]
+
+
 # ---------------------------------------------------------------------------
 # 1. Sampling berita
 # ---------------------------------------------------------------------------
@@ -154,18 +165,127 @@ def _grounding_for(sample: List[Dict[str, Any]]) -> str:
     return "news" if len(sample) >= MIN_ARTICLES_FOR_GROUNDING else "none"
 
 
-def _sample_news_for_grounding(
-    tickers_from_universe: List[Dict[str, Any]], as_of_date: Optional[str]
-) -> Tuple[List[str], str]:
+def build_grounding_from_news(
+    universe: List[Dict[str, Any]], as_of_date: Optional[str]
+) -> GroundingResult:
+    """Bangun grounding dari sampling berita — Tahap 4 §1 desain (Opsi a).
+
+    Menggantikan `_sample_news_for_grounding` (dihapus — supersede penuh oleh
+    fungsi ini) DAN logika inline yang sebelumnya ada langsung di dalam
+    `generate_personas`. Perilaku sampling itu sendiri (`_sample_articles`/
+    `_grounding_for`/`_format_article_line`) TIDAK berubah, cuma dipindah +
+    dibungkus jadi `GroundingResult` supaya `generate_personas` bisa generik
+    menerima grounding sudah jadi dari sumber manapun.
     """
-    Return (baris teks siap prompt, grounding). grounding="none" (dan list kosong)
-    bila artikel setelah dedup < 10, termasuk as_of_date di luar ~360 hari.
-    """
-    sample = _sample_articles(tickers_from_universe, as_of_date)
+    sample = _sample_articles(universe, as_of_date)
     grounding = _grounding_for(sample)
     if grounding == "none":
-        return [], "none"
-    return [_format_article_line(a) for a in sample], "news"
+        return GroundingResult(
+            news_lines=[], grounding="none", source="news",
+            provenance={"article_ids": [], "sample_articles": []},
+        )
+    return GroundingResult(
+        news_lines=[_format_article_line(a) for a in sample],
+        grounding="news",
+        source="news",
+        provenance={
+            "article_ids": [a["article_id"] for a in sample],
+            "sample_articles": _sample_articles_for_storage(sample),
+        },
+    )
+
+
+# --- Tahap 4 §2 desain: anggaran token dinamis untuk grounding dari graph Zep ---
+ZEP_GROUNDING_TOKEN_BUDGET = 15_000  # 500 (prompt) + 15.000 (grounding) + ~3.000
+                                       # (output 8 persona) ~= 18.500 token ~= 56,5%
+                                       # dari context window 32.768 (Qwen2.5-7B)
+_GROUNDING_TOKENIZER_MODEL_ID = "Qwen/Qwen2.5-7B-Instruct-AWQ"  # HARDCODE, sengaja
+    # TIDAK diturunkan dari Config.LLM_MODEL_NAME (default 'gpt-4o-mini' bukan repo
+    # HuggingFace valid) — lihat catatan operasional desain §2.
+_grounding_tokenizer = None  # lazy singleton module-level, dimuat SEKALI per proses
+
+
+def _get_grounding_tokenizer():
+    """AutoTokenizer.from_pretrained makan 1,7-6,3 detik/panggilan (diukur
+    investigasi) — dimuat sekali, bukan tiap panggilan build_grounding_from_graph."""
+    global _grounding_tokenizer
+    if _grounding_tokenizer is None:
+        from transformers import AutoTokenizer
+        _grounding_tokenizer = AutoTokenizer.from_pretrained(_GROUNDING_TOKENIZER_MODEL_ID)
+    return _grounding_tokenizer
+
+
+def _format_entity_text(entity: Dict[str, Any]) -> str:
+    """1 entity FilteredEntities -> 1 blok teks. Format PERSIS investigasi
+    (divalidasi dengan tokenizer nyata): "Type: Name - Summary" + bullet
+    SEMUA related_edges (tidak dipotong sebagian — lihat desain §2)."""
+    custom_labels = [l for l in entity.get("labels", []) if l not in ("Entity", "Node")]
+    entity_type = custom_labels[0] if custom_labels else "Entity"
+    lines = [f"{entity_type}: {entity['name']} - {entity.get('summary') or ''}"]
+    for edge in entity.get("related_edges") or []:
+        lines.append(f"  - {edge.get('edge_name', '')}: {edge.get('fact', '')}")
+    return "\n".join(lines)
+
+
+def build_grounding_from_graph(
+    filtered_entities: Dict[str, Any],
+    token_budget: int = ZEP_GROUNDING_TOKEN_BUDGET,
+) -> GroundingResult:
+    """Bangun grounding dari FilteredEntities Tahap 3 — Tahap 4 §2 desain.
+
+    Urutkan entity by degree (len(related_edges)) tertinggi->terendah, masukkan
+    satu per satu sambil menghitung token berjalan (tokenizer asli, bukan
+    estimasi), STOP begitu entity berikutnya akan melebihi `token_budget`
+    (entity itu TIDAK dimasukkan, bukan dipotong sebagian). EDGE CASE 2: entity
+    PERTAMA (degree tertinggi) SELALU masuk apa adanya walau sendirian sudah
+    melebihi budget — membuang entity paling terhubung demi kepatuhan ketat ke
+    budget adalah trade-off yang lebih buruk (lihat desain §2 untuk alasan).
+    `filtered_entities` kosong -> GroundingResult kosong (grounding="none"),
+    JANGAN error.
+    """
+    entities = filtered_entities.get("entities") or []
+    empty = GroundingResult(
+        news_lines=[], grounding="none", source="zep_graph",
+        provenance={
+            "source_entity_count": 0, "source_entity_names": [],
+            "source_grounding_tokens": 0, "filter_method_used": "top_degree_token_budget",
+        },
+    )
+    if not entities:
+        return empty
+
+    ranked = sorted(entities, key=lambda e: len(e.get("related_edges") or []), reverse=True)
+    tokenizer = _get_grounding_tokenizer()
+
+    news_lines: List[str] = []
+    included_names: List[str] = []
+    total_tokens = 0
+
+    for entity in ranked:
+        text = _format_entity_text(entity)
+        entity_tokens = len(tokenizer.encode(text))
+        if total_tokens > 0 and total_tokens + entity_tokens > token_budget:
+            break  # STOP -- entity ini TIDAK dimasukkan, bukan dipotong sebagian
+        news_lines.append(text)
+        included_names.append(entity["name"])
+        total_tokens += entity_tokens
+        # Guard `total_tokens > 0` di atas SENGAJA membuat entity PERTAMA selalu
+        # masuk walau sendirian > token_budget (EDGE CASE 2 desain §2).
+
+    if not news_lines:
+        return empty  # tidak realistis tercapai (EDGE CASE 2 selalu meloloskan 1), defensif
+
+    return GroundingResult(
+        news_lines=news_lines,
+        grounding="zep_graph",
+        source="zep_graph",
+        provenance={
+            "source_entity_count": len(news_lines),
+            "source_entity_names": included_names,
+            "source_grounding_tokens": total_tokens,
+            "filter_method_used": "top_degree_token_budget",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -200,9 +320,9 @@ At least 2 must be unconventional (not a sober fundamental investor), and at
 least 1 must be strongly emotional or irrational in a way that is a bias.
 """
 
-_NEWS_INSTRUCTION = """
-Use the news below only as loose inspiration for the market mood. You do not
-need to reference it, and you must not treat it as facts to verify.
+_GROUNDING_INSTRUCTION = """
+Use the market context below only as loose inspiration for the mood. You do
+not need to reference it, and you must not treat it as facts to verify.
 """
 
 _NO_NEWS_INSTRUCTION = """
@@ -228,14 +348,30 @@ Return JSON:
 
 
 def _build_persona_prompt(news_lines: List[str], grounding: str) -> Tuple[str, str]:
-    """Return (system_prompt, user_prompt). grounding=="none" -> tanpa blok berita."""
-    if grounding == "news" and news_lines:
-        news_block = (
-            f"\nMARKET NEWS SAMPLE ({len(news_lines)} articles, deduplicated):\n"
+    """Return (system_prompt, user_prompt). grounding=="none" -> tanpa blok konteks.
+
+    BUGFIX (ditemukan verifikasi E2E Tahap 4->6, 2026-09-24): kondisi ini
+    sebelumnya `grounding == "news"` -- hardcode ke SATU sumber grounding,
+    sehingga grounding.grounding=="zep_graph" (Tahap 4, entity dari graph Zep)
+    diam-diam jatuh ke jalur "tanpa grounding sama sekali", walau
+    `news_lines` berisi puluhan-ratusan baris entity nyata. Dikonfirmasi
+    lewat eksekusi langsung: prompt yang terkirim ke LLM tidak mengandung
+    satupun baris entity, dan token yang benar-benar terpakai (~499) cocok
+    persis dengan jalur "no grounding", bukan ~13.400 yang seharusnya.
+
+    Kondisi diperbaiki jadi `grounding != "none"` (bukan enumerasi eksplisit
+    "news"/"zep_graph") SUPAYA kelas bug yang SAMA tidak terulang kalau nanti
+    ada sumber grounding ketiga -- blok konteks otomatis disertakan untuk
+    SEMUA sumber yang punya isi, satu-satunya nilai yang sengaja
+    mengecualikannya adalah "none" itu sendiri.
+    """
+    if grounding != "none" and news_lines:
+        context_block = (
+            f"\nMARKET CONTEXT SAMPLE ({len(news_lines)} items):\n"
             + "\n".join(news_lines)
             + "\n"
         )
-        user = _USER_HEAD + _NEWS_INSTRUCTION + news_block + _USER_SCHEMA
+        user = _USER_HEAD + _GROUNDING_INSTRUCTION + context_block + _USER_SCHEMA
     else:
         user = _USER_HEAD + _NO_NEWS_INSTRUCTION + _USER_SCHEMA
     return _SYSTEM_PROMPT, user
@@ -412,7 +548,25 @@ def _temperature_for_attempt(attempt: int) -> float:
     return round(max(BASE_TEMPERATURE - attempt * TEMPERATURE_STEP, TEMPERATURE_FLOOR), 2)
 
 
+def _provenance_for_result(grounding: GroundingResult) -> Dict[str, Any]:
+    """Union field provenance kedua sumber (Tahap 4 §5 desain) — field yang
+    tidak relevan untuk sumber aktif diisi nilai netral ([]/0/None), TIDAK
+    dihilangkan dari dict (beda dari pola Tahap 3 §7 "key hilang = gagal":
+    di sini KEDUA jalur sama-sama hasil SUKSES, cuma beda metodologi)."""
+    p = grounding.provenance
+    return {
+        "article_ids": p.get("article_ids", []),
+        "sample_articles": p.get("sample_articles", []),
+        "source_graph_id": p.get("source_graph_id"),
+        "source_entity_count": p.get("source_entity_count", 0),
+        "source_entity_names": p.get("source_entity_names", []),
+        "source_grounding_tokens": p.get("source_grounding_tokens", 0),
+        "filter_method_used": p.get("filter_method_used"),
+    }
+
+
 def generate_personas(
+    grounding: GroundingResult,
     as_of_date: Optional[str] = None,
     max_attempts: int = 3,
     sectors: Optional[List[str]] = None,
@@ -423,37 +577,18 @@ def generate_personas(
     Non-deterministik by design. Gagal setelah max_attempts -> {"success": False, ...}
     tanpa fallback template dan tanpa persona parsial.
 
-    sectors / market_cap_tiers diteruskan apa adanya ke screen_universe dan menjadi
-    bagian kunci persistence (universe_key).
-
-    screen_universe GAGAL (raise: mis. market_cap_tiers tidak valid, konstituen
-    S&P 500 tidak bisa dimuat) -> berhenti total, success=False, LLM TIDAK dipanggil.
-    Universe KOSONG tanpa error -> lanjut dengan grounding="none" (berhasil-tapi-kosong).
+    `grounding` SUDAH JADI (dibangun caller lewat `build_grounding_from_news` atau
+    `build_grounding_from_graph` — Tahap 4 §1 desain, Opsi a) — fungsi ini GENERIK,
+    tidak tahu/peduli dari mana asalnya. sectors/market_cap_tiers HANYA dipakai
+    untuk cache key (`_screening_params`) — screen_universe TIDAK lagi dipanggil
+    di sini (tanggung jawab caller sekarang, konsisten dengan `build_universe_graph`
+    Tahap 3 yang juga tidak menangani kegagalan screen_universe secara khusus).
     """
-    screening = _screening_params(sectors, market_cap_tiers)
-    try:
-        universe = screen_universe(
-            sectors=sectors, market_cap_tiers=market_cap_tiers, as_of_date=as_of_date
-        )
-    except Exception as e:
-        logger.error(f"screen_universe gagal, generate_personas dihentikan tanpa memanggil LLM: {e}")
-        return {
-            "success": False,
-            "error": f"screen_universe gagal: {e}",
-            "as_of_date": as_of_date,
-            "screening": screening,
-        }
-    if not universe:
-        logger.warning("Universe kosong — generate tanpa grounding berita")
-
-    sample = _sample_articles(universe, as_of_date)
-    grounding = _grounding_for(sample)
-    news_lines = [_format_article_line(a) for a in sample] if grounding == "news" else []
-    article_ids = [a["article_id"] for a in sample] if grounding == "news" else []
-    sample_articles = _sample_articles_for_storage(sample) if grounding == "news" else []
-    system_prompt, user_prompt = _build_persona_prompt(news_lines, grounding)
-    if grounding == "none":
-        logger.warning(f"grounding='none' (artikel sample={len(sample)} < {MIN_ARTICLES_FOR_GROUNDING})")
+    screening = _screening_params(sectors, market_cap_tiers, grounding.source)
+    news_lines = grounding.news_lines
+    system_prompt, user_prompt = _build_persona_prompt(news_lines, grounding.grounding)
+    if grounding.grounding == "none":
+        logger.warning(f"grounding='none' (sumber={grounding.source})")
 
     client = _get_llm_client()
     last_error = "tidak ada attempt dijalankan"
@@ -510,9 +645,9 @@ def generate_personas(
             "model": Config.LLM_MODEL_NAME,
             "temperature_used": temperature,
             "attempt": attempt + 1,
-            "grounding": grounding,
-            "article_ids": article_ids,
-            "sample_articles": sample_articles,
+            "grounding": grounding.grounding,
+            "grounding_source": grounding.source,
+            **_provenance_for_result(grounding),
             "personas": [asdict(p) for p in personas],
             "warnings": warnings,
             "from_cache": False,
@@ -532,7 +667,7 @@ def generate_personas(
         "error": f"gagal setelah {max_attempts} attempt; terakhir: {last_error}",
         "as_of_date": as_of_date,
         "screening": screening,
-        "grounding": grounding,
+        "grounding": grounding.grounding,
     }
 
 
@@ -559,27 +694,42 @@ CREATE TABLE IF NOT EXISTS persona_runs (
     article_ids_json TEXT NOT NULL,
     personas_json TEXT NOT NULL,
     warnings_json TEXT NOT NULL,
-    sample_json TEXT
+    sample_json TEXT,
+    provenance_json TEXT
 );
 """
 
 # Kunci composite = (as_of_key, universe_key). universe_key = sha256 dari PARAMETER
-# screening (sectors, market_cap_tiers), bukan dari daftar ticker hasil screening:
-# (1) bisa dihitung SEBELUM screen_universe dijalankan, jadi cache hit tidak perlu
-# memindai ~500 ticker; (2) stabil — fundamental/market cap bukan point-in-time
-# sehingga daftar ticker bisa bergeser antar hari untuk parameter yang sama, dan
-# itu tidak boleh membuat run tersimpan "hilang". Kompromi yang disadari: dua
-# daftar ticker berbeda dari parameter identik dianggap universe yang sama.
+# screening (sectors, market_cap_tiers[, grounding_source] — Tahap 4 §3), bukan dari
+# daftar ticker hasil screening: (1) bisa dihitung SEBELUM screen_universe dijalankan,
+# jadi cache hit tidak perlu memindai ~500 ticker; (2) stabil — fundamental/market cap
+# bukan point-in-time sehingga daftar ticker bisa bergeser antar hari untuk parameter
+# yang sama, dan itu tidak boleh membuat run tersimpan "hilang". Kompromi yang disadari:
+# dua daftar ticker berbeda dari parameter identik dianggap universe yang sama.
 
 
 def _screening_params(
-    sectors: Optional[List[str]], market_cap_tiers: Optional[List[str]]
+    sectors: Optional[List[str]],
+    market_cap_tiers: Optional[List[str]],
+    grounding_source: str = "news",
 ) -> Dict[str, Any]:
-    """Normalisasi (urutan/duplikat tidak berpengaruh; None tetap beda dari [])."""
-    return {
+    """Normalisasi (urutan/duplikat tidak berpengaruh; None tetap beda dari []).
+
+    `grounding_source="news"` (default) TIDAK menambah key baru ke payload hash
+    — hash-nya PERSIS sama seperti sebelum Tahap 4 ada, supaya persona_runs
+    lama (semuanya jalur news) TETAP valid sebagai cache hit. Sumber lain
+    (mis. "zep_graph") SELALU menambah key ini, sehingga TIDAK PERNAH
+    menghasilkan hash yang sama dengan kombinasi sectors/tiers identik di
+    jalur "news" — tabrakan cache yang jadi temuan investigasi Tahap 4 §4
+    secara struktural tidak mungkin terjadi lagi (Tahap 4 §3 desain).
+    """
+    params: Dict[str, Any] = {
         "sectors": sorted(set(sectors)) if sectors is not None else None,
         "market_cap_tiers": sorted(set(market_cap_tiers)) if market_cap_tiers is not None else None,
     }
+    if grounding_source != "news":
+        params["grounding_source"] = grounding_source
+    return params
 
 
 def _universe_key(screening: Dict[str, Any]) -> str:
@@ -605,6 +755,12 @@ def _connect() -> sqlite3.Connection:
     if "sample_json" not in cols:
         # Nullable: baris lama (sebelum kolom ini) dibaca sebagai sample_articles=[].
         conn.execute("ALTER TABLE persona_runs ADD COLUMN sample_json TEXT")
+    if "provenance_json" not in cols:
+        # Tahap 4 §6 desain: kolom BARU (bukan reinterpretasi sample_json, yang
+        # semantiknya terikat ke bentuk artikel Finnhub). Nullable: NULL untuk
+        # jalur news (provenance-nya sudah cukup lewat article_ids_json/sample_json)
+        # dan untuk baris lama sebelum kolom ini ada.
+        conn.execute("ALTER TABLE persona_runs ADD COLUMN provenance_json TEXT")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_persona_runs_key ON persona_runs (as_of_key, universe_key, generated_at)"
     )
@@ -614,10 +770,24 @@ def _connect() -> sqlite3.Connection:
 def _save_run(result: Dict[str, Any]) -> None:
     conn = _connect()
     try:
+        provenance_payload = None
+        if result.get("grounding_source") == "zep_graph":
+            # Tahap 4 §6 desain: kolom provenance_json HANYA diisi untuk jalur
+            # zep_graph -- jalur news sudah punya article_ids_json/sample_json.
+            provenance_payload = json.dumps(
+                {
+                    "source_graph_id": result.get("source_graph_id"),
+                    "source_entity_count": result.get("source_entity_count"),
+                    "source_entity_names": result.get("source_entity_names"),
+                    "source_grounding_tokens": result.get("source_grounding_tokens"),
+                    "filter_method_used": result.get("filter_method_used"),
+                },
+                ensure_ascii=False,
+            )
         conn.execute(
             "INSERT INTO persona_runs (run_id, as_of_key, universe_key, screening_json, generated_at, "
             "model, temperature_used, attempt, grounding, article_ids_json, personas_json, warnings_json, "
-            "sample_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "sample_json, provenance_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 result["run_id"], _as_of_key(result["as_of_date"]), result["universe_key"],
                 json.dumps(result["screening"]), result["generated_at"],
@@ -626,6 +796,7 @@ def _save_run(result: Dict[str, Any]) -> None:
                 json.dumps(result["personas"], ensure_ascii=False),
                 json.dumps(result["warnings"], ensure_ascii=False),
                 json.dumps(result.get("sample_articles", []), ensure_ascii=False),
+                provenance_payload,
             ),
         )
         conn.commit()
@@ -639,7 +810,8 @@ def _load_latest_run(as_of_date: Optional[str], screening: Dict[str, Any]) -> Op
     try:
         row = conn.execute(
             "SELECT run_id, generated_at, model, temperature_used, attempt, grounding, "
-            "article_ids_json, personas_json, warnings_json, sample_json FROM persona_runs "
+            "article_ids_json, personas_json, warnings_json, sample_json, provenance_json "
+            "FROM persona_runs "
             "WHERE as_of_key = ? AND universe_key = ? ORDER BY generated_at DESC, rowid DESC LIMIT 1",
             (_as_of_key(as_of_date), universe_key),
         ).fetchone()
@@ -647,6 +819,9 @@ def _load_latest_run(as_of_date: Optional[str], screening: Dict[str, Any]) -> Op
         conn.close()
     if row is None:
         return None
+    # NULL (jalur news, atau baris lama sebelum kolom ini ada) -> "tidak ada
+    # provenance graph", bukan crash -- pola fallback PERSIS sample_json.
+    provenance = json.loads(row[10]) if row[10] else {}
     return {
         "success": True,
         "run_id": row[0],
@@ -658,9 +833,17 @@ def _load_latest_run(as_of_date: Optional[str], screening: Dict[str, Any]) -> Op
         "temperature_used": row[3],
         "attempt": row[4],
         "grounding": row[5],
+        # screening_json baris lama tidak pernah punya key ini -> default "news",
+        # backward-compatible dengan _screening_params (Tahap 4 §3 desain).
+        "grounding_source": screening.get("grounding_source", "news"),
         "article_ids": json.loads(row[6]),
         # NULL (run lama sebelum kolom sample_json) -> [] : adapter memakai fallback "tanpa headline".
         "sample_articles": json.loads(row[9]) if row[9] else [],
+        "source_graph_id": provenance.get("source_graph_id"),
+        "source_entity_count": provenance.get("source_entity_count", 0),
+        "source_entity_names": provenance.get("source_entity_names", []),
+        "source_grounding_tokens": provenance.get("source_grounding_tokens", 0),
+        "filter_method_used": provenance.get("filter_method_used"),
         "personas": json.loads(row[7]),
         "warnings": json.loads(row[8]),
         "from_cache": True,
@@ -669,19 +852,23 @@ def _load_latest_run(as_of_date: Optional[str], screening: Dict[str, Any]) -> Op
 
 
 def get_or_generate_personas(
+    grounding: GroundingResult,
     as_of_date: Optional[str] = None,
     force_regenerate: bool = False,
+    max_attempts: int = 3,
     sectors: Optional[List[str]] = None,
     market_cap_tiers: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
-    Pakai persona tersimpan terbaru untuk (as_of_date, universe) bila ada; kalau tidak
-    (atau force_regenerate=True) generate baru. sectors/market_cap_tiers HARUS sama
-    dengan yang dipakai untuk sampling berita — parameter yang sama diteruskan ke
-    generate_personas. Ini BUKAN determinisme: generate_personas() tetap
-    non-deterministik, ini hanya menghindari generate ulang.
+    Pakai persona tersimpan terbaru untuk (as_of_date, universe, grounding.source)
+    bila ada; kalau tidak (atau force_regenerate=True) generate baru lewat
+    generate_personas. `grounding` SUDAH dibangun caller (build_grounding_from_news/
+    build_grounding_from_graph — Tahap 4 §1/§4 desain). sectors/market_cap_tiers
+    HARUS sama dengan yang dipakai membangun `grounding` — parameter yang sama
+    diteruskan ke generate_personas untuk cache key. Ini BUKAN determinisme:
+    generate_personas() tetap non-deterministik, ini hanya menghindari generate ulang.
     """
-    screening = _screening_params(sectors, market_cap_tiers)
+    screening = _screening_params(sectors, market_cap_tiers, grounding.source)
     if not force_regenerate:
         try:
             stored = _load_latest_run(as_of_date, screening)
@@ -694,4 +881,43 @@ def get_or_generate_personas(
                 f"run_id={stored['run_id']}"
             )
             return stored
-    return generate_personas(as_of_date, sectors=sectors, market_cap_tiers=market_cap_tiers)
+    return generate_personas(
+        grounding, as_of_date, max_attempts, sectors=sectors, market_cap_tiers=market_cap_tiers
+    )
+
+
+def generate_personas_from_universe_graph(
+    as_of_date: Optional[str] = None,
+    sectors: Optional[List[str]] = None,
+    market_cap_tiers: Optional[List[str]] = None,
+    force_regenerate: bool = False,
+) -> Dict[str, Any]:
+    """Convenience murni: rantai Tahap 3 (build_universe_graph) -> Tahap 4
+    (get_or_generate_personas) dalam 1 panggilan BLOCKING — Tahap 4 §4 desain.
+
+    JANGAN dipakai dari jalur request HTTP sinkron — Tahap 3 sendiri bisa makan
+    waktu ~18 menit sampai ~2,3+ JAM tergantung skala universe
+    (docs/design/tahap3_zep_feed_design.md), dan cache-miss di sini akan
+    membuat panggilan ini blocking selama itu tanpa sinyal apapun di
+    signature-nya. Cocok HANYA untuk skrip CLI/cron/batch job yang memang
+    menerima blocking selama itu.
+    """
+    from .universe_graph_builder import build_universe_graph  # deferred: pemakai
+        # jalur news saja tidak perlu import Zep/GraphBuilderService
+
+    tahap3_result = build_universe_graph(as_of_date, sectors, market_cap_tiers)
+    if not tahap3_result["success"]:
+        return {
+            "success": False,
+            "error": f"Tahap 3 gagal: {tahap3_result['error']}",
+            "as_of_date": as_of_date,
+        }
+    grounding = build_grounding_from_graph(tahap3_result["filtered_entities"])
+    grounding.provenance["source_graph_id"] = tahap3_result.get("graph_id")
+    return get_or_generate_personas(
+        grounding,
+        as_of_date=as_of_date,
+        force_regenerate=force_regenerate,
+        sectors=sectors,
+        market_cap_tiers=market_cap_tiers,
+    )

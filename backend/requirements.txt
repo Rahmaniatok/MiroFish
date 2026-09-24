@@ -45,3 +45,9 @@ python-dateutil>=2.9.0
 # 显式声明：market_data.py 直接 import numpy，并依赖 yfinance 返回的 pandas 结构。
 numpy>=1.26.0
 pandas>=2.0.0
+
+# ============= Tahap 4（persona 来自 Zep graph）=============
+# AutoTokenizer 用真实部署模型（Qwen2.5-7B-Instruct-AWQ）的 tokenizer 精确计算
+# grounding 文本的 token 预算，而非字符数估算。此前只是 sentence-transformers
+# （camel-oasis 的传递依赖）附带装上，这里显式声明，避免该传递依赖链变动时静默失效。
+transformers>=4.57.0

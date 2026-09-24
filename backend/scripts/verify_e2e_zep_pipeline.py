@@ -1,24 +1,27 @@
 """
-Fase 11 — Verifikasi END-TO-END SUNGGUHAN dari seluruh alur Fase 8-11a:
+Verifikasi END-TO-END SUNGGUHAN dari rantai BARU (Zep sebagai sumber grounding):
 
-    get_or_generate_personas() -> build_oasis_artifacts() -> SimulationRunner.start_simulation()
+    screen_universe() -> build_universe_graph() [Tahap 3, Zep] ->
+    build_grounding_from_graph() [Tahap 4] -> generate_personas() ->
+    build_oasis_artifacts() -> SimulationRunner.start_simulation()
 
-TANPA mock: LLM sungguhan (RunPod Qwen2.5-7B), Finnhub sungguhan, yfinance sungguhan,
-OASIS sungguhan (2 platform, 10 round, follow-network lengkap).
+TANPA mock: Zep Cloud sungguhan, Finnhub sungguhan, LLM sungguhan (RunPod
+Qwen2.5-7B), yfinance sungguhan, OASIS sungguhan (2 platform, 10 round,
+follow-network lengkap).
 
-Ini BUKAN test otomatis (tidak ada assert yang menggagalkan CI) dan BUKAN skrip sekali-pakai:
-dipertahankan sebagai referensi untuk regression-check manual berikutnya. Jalankan dari
-direktori backend/:
+Ini BUKAN test otomatis dan BUKAN skrip sekali-pakai — dipertahankan seperti
+scripts/verify_e2e_pipeline.py (jalur news lama) untuk regression-check manual
+berikutnya, kali ini untuk jalur Zep. Jalankan dari direktori backend/:
 
-    cd backend && python scripts/verify_e2e_pipeline.py
+    cd backend && python scripts/verify_e2e_zep_pipeline.py
 
-Argumen opsional: --sim-id, --sectors (comma-separated GICS names), --as-of-date (ISO atau
-kosong = live), --max-wait-seconds (langit-langit polling, BUKAN estimasi durasi asli),
---skip-simulation (hanya jalankan persona+artifact, tanpa OASIS — untuk pengecekan murah).
+Argumen opsional: --sim-id, --sectors, --as-of-date, --max-wait-seconds,
+--poll-interval, --skip-simulation (hanya step a-d, murah, untuk pengecekan
+persona+grounding tanpa membayar biaya OASIS penuh).
 
-Semua temuan (timing, warning, enrichment, follow-network, distribusi aksi, contoh konten,
-estimasi token) ditulis ke <sim_dir>/e2e_verification_findings.json untuk dibaca ulang saat
-menyusun laporan markdown. Biaya LLM sungguhan akan terpakai setiap kali skrip ini dijalankan.
+Menulis <sim_dir>/e2e_zep_verification_findings.json (nama berbeda dari
+e2e_verification_findings.json jalur lama supaya tidak saling menimpa kalau
+--sim-id sama secara tidak sengaja).
 """
 
 import argparse
@@ -43,10 +46,8 @@ if os.path.exists(_env_file):
 
 
 # ---------------------------------------------------------------------------
-# Token-usage capture: patches the OpenAI SDK client itself (not any MiroFish
-# source file) so every real completion call made anywhere in this process —
-# persona generation, enrichment, LLM warm-up, and every OASIS agent decision
-# during the simulation — is counted uniformly in one place.
+# Token-usage capture -- identik verify_e2e_pipeline.py (jalur news), lihat
+# docstring-nya untuk keterbatasan (tidak menjangkau subprocess OASIS).
 # ---------------------------------------------------------------------------
 _usage_log = []
 
@@ -92,9 +93,16 @@ _install_usage_capture()
 
 from app.config import Config  # noqa: E402
 from app.data_layer.universe import screen_universe  # noqa: E402
-from app.services.persona_generator import build_grounding_from_news, get_or_generate_personas  # noqa: E402
+from app.services.persona_generator import (  # noqa: E402
+    build_grounding_from_graph,
+    generate_personas,
+    get_or_generate_personas,
+    _screening_params,
+    _universe_key,
+)
 from app.services.persona_oasis_adapter import build_oasis_artifacts  # noqa: E402
 from app.services.simulation_runner import SimulationRunner, RunnerStatus  # noqa: E402
+from app.services.universe_graph_builder import build_universe_graph  # noqa: E402
 
 
 def log(msg):
@@ -131,6 +139,11 @@ def analyze_follow_network(sim_dir, platform):
     }
 
 
+# Semua ticker universe (44 nama, diisi dari step a) dipakai analyze_actions
+# untuk menghitung berapa BANYAK darinya yang benar-benar disebut di konten.
+_UNIVERSE_TICKERS = set()
+
+
 def analyze_actions(sim_dir, platform):
     actions_path = os.path.join(sim_dir, platform, "actions.jsonl")
     if not os.path.exists(actions_path):
@@ -142,6 +155,7 @@ def analyze_actions(sim_dir, platform):
     content_examples = []
     rounds_seen = set()
     total_lines = 0
+    mentioned_tickers = Counter()
 
     with open(actions_path, "r", encoding="utf-8") as f:
         for line in f:
@@ -167,6 +181,9 @@ def analyze_actions(sim_dir, platform):
                     "action_type": atype,
                     "content": content,
                 })
+                for ticker in _UNIVERSE_TICKERS:
+                    if f"${ticker}" in content or f" {ticker} " in f" {content} ":
+                        mentioned_tickers[ticker] += 1
 
     non_round0_follows = {r: c for r, c in follow_actions_by_round.items() if r != 0}
     all_rounds = sorted(r for r in rounds_seen if r is not None and r > 0)
@@ -189,6 +206,8 @@ def analyze_actions(sim_dir, platform):
         "follow_actions_outside_round0": non_round0_follows,
         "content_examples_sample": content_examples[:8],
         "content_examples_total": len(content_examples),
+        "universe_tickers_mentioned_in_content": dict(mentioned_tickers),
+        "distinct_universe_tickers_mentioned": len(mentioned_tickers),
     }
 
 
@@ -215,19 +234,19 @@ def analyze_log(sim_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Verifikasi E2E Fase 8-11a (SUNGGUHAN, tanpa mock)")
+    global _UNIVERSE_TICKERS
+
+    parser = argparse.ArgumentParser(description="Verifikasi E2E rantai Zep (SUNGGUHAN, tanpa mock)")
     parser.add_argument("--sim-id", default=None)
     parser.add_argument("--sectors", default="Energy,Communication Services")
     parser.add_argument("--as-of-date", default=None, help="ISO YYYY-MM-DD; kosong = live (hari ini)")
-    parser.add_argument("--max-wait-seconds", type=int, default=2700,
-                         help="Langit-langit polling run_state.json (BUKAN estimasi durasi; default 45 menit)")
+    parser.add_argument("--max-wait-seconds", type=int, default=3600)
     parser.add_argument("--poll-interval", type=int, default=10)
-    parser.add_argument("--skip-simulation", action="store_true",
-                         help="Hanya jalankan persona+artifact (step 2-3), lewati OASIS run (step 4-6)")
+    parser.add_argument("--skip-simulation", action="store_true")
     args = parser.parse_args()
 
     sectors = [s.strip() for s in args.sectors.split(",") if s.strip()]
-    sim_id = args.sim_id or f"sim_e2e_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    sim_id = args.sim_id or f"sim_e2e_zep_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     findings = {
         "started_at": datetime.now(timezone.utc).isoformat(),
@@ -244,7 +263,7 @@ def main():
 
     def flush_findings():
         os.makedirs(sim_dir, exist_ok=True)
-        out_path = os.path.join(sim_dir, "e2e_verification_findings.json")
+        out_path = os.path.join(sim_dir, "e2e_zep_verification_findings.json")
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(findings, f, ensure_ascii=False, indent=2, default=str)
         log(f"Findings ditulis: {out_path}")
@@ -252,69 +271,158 @@ def main():
 
     try:
         # ------------------------------------------------------------------
-        # STEP 2: get_or_generate_personas — SUNGGUHAN
+        # STEP a: screen_universe -- SUNGGUHAN
         # ------------------------------------------------------------------
-        log(f"STEP 2: get_or_generate_personas(as_of_date={args.as_of_date!r}, sectors={sectors})")
+        log(f"STEP a: screen_universe(sectors={sectors})")
         t0 = time.monotonic()
-        # Tahap 4 refactor (docs/design/tahap4_persona_from_graph_design.md §1):
-        # get_or_generate_personas() sekarang generik, menerima grounding SUDAH
-        # JADI -- screen_universe + build_grounding_from_news dipanggil di sini
-        # (level caller), bukan lagi di dalam persona_generator.py.
         universe = screen_universe(sectors=sectors, market_cap_tiers=None, as_of_date=args.as_of_date)
-        grounding = build_grounding_from_news(universe, args.as_of_date)
-        personas_result = get_or_generate_personas(
-            grounding, as_of_date=args.as_of_date, sectors=sectors, market_cap_tiers=None
-        )
-        t_persona = time.monotonic() - t0
-        log(f"STEP 2 selesai dalam {t_persona:.1f}s, success={personas_result.get('success')}")
-
-        if not personas_result.get("success"):
-            findings["step2_status"] = "GAGAL"
-            findings["step2_error"] = personas_result.get("error")
-            flush_findings()
-            log("BERHENTI: persona generation gagal.")
-            return
-
-        findings["step2_status"] = "OK"
-        findings["step2"] = {
-            "elapsed_seconds": round(t_persona, 1),
-            "run_id": personas_result["run_id"],
-            "from_cache": personas_result.get("from_cache"),
-            "grounding": personas_result["grounding"],
-            "sample_articles_count": len(personas_result.get("sample_articles") or []),
-            "article_ids": personas_result.get("article_ids"),
-            "warnings": personas_result.get("warnings"),
-            "temperature_used": personas_result.get("temperature_used"),
-            "attempt": personas_result.get("attempt"),
-            "personas_summary": [
-                {"name": p["name"], "philosophy_label": p["philosophy_label"], "tagline": p["tagline"]}
-                for p in personas_result["personas"]
-            ],
+        t_a = time.monotonic() - t0
+        _UNIVERSE_TICKERS = {c["ticker"] for c in universe}
+        log(f"STEP a selesai dalam {t_a:.1f}s, {len(universe)} ticker lolos")
+        findings["step_a"] = {
+            "elapsed_seconds": round(t_a, 1),
+            "universe_count": len(universe),
+            "universe_tickers": sorted(_UNIVERSE_TICKERS),
         }
 
         # ------------------------------------------------------------------
-        # STEP 3: build_oasis_artifacts — SUNGGUHAN
+        # STEP b: build_universe_graph -- Tahap 3, Zep SUNGGUHAN
         # ------------------------------------------------------------------
-        log(f"STEP 3: build_oasis_artifacts(simulation_id={sim_id})")
+        log(f"STEP b: build_universe_graph(as_of_date={args.as_of_date!r}, sectors={sectors})")
+        t0 = time.monotonic()
+        tahap3_result = build_universe_graph(args.as_of_date, sectors, None)
+        t_b = time.monotonic() - t0
+        log(f"STEP b selesai dalam {t_b:.1f}s, success={tahap3_result.get('success')}")
+
+        if not tahap3_result.get("success"):
+            findings["step_b_status"] = "GAGAL"
+            findings["step_b_error"] = tahap3_result.get("error")
+            findings["step_b"] = {"elapsed_seconds": round(t_b, 1)}
+            flush_findings()
+            log("BERHENTI: build_universe_graph (Tahap 3) gagal.")
+            return
+
+        findings["step_b_status"] = "OK"
+        fe = tahap3_result["filtered_entities"]
+        findings["step_b"] = {
+            "elapsed_seconds": round(t_b, 1),
+            "item_count": tahap3_result["item_count"],
+            "failed_tickers_count": len(tahap3_result["failed_tickers"]),
+            "failed_tickers": tahap3_result["failed_tickers"],
+            "ingest_seconds": tahap3_result["ingest_seconds"],
+            "graph_id": tahap3_result.get("graph_id"),
+            "filtered_entities_total_count": fe["total_count"],
+            "filtered_entities_filtered_count": fe["filtered_count"],
+            "filtered_entities_types": fe["entity_types"],
+        }
+
+        # ------------------------------------------------------------------
+        # STEP c: build_grounding_from_graph -- Tahap 4 builder
+        # ------------------------------------------------------------------
+        log("STEP c: build_grounding_from_graph(filtered_entities)")
+        t0 = time.monotonic()
+        grounding = build_grounding_from_graph(fe)
+        t_c = time.monotonic() - t0
+        grounding.provenance["source_graph_id"] = tahap3_result.get("graph_id")
+        log(
+            f"STEP c selesai dalam {t_c:.1f}s, grounding={grounding.grounding}, "
+            f"entity_terpakai={grounding.provenance.get('source_entity_count')}, "
+            f"token={grounding.provenance.get('source_grounding_tokens')}"
+        )
+        findings["step_c"] = {
+            "elapsed_seconds": round(t_c, 1),
+            "grounding": grounding.grounding,
+            "source": grounding.source,
+            "provenance": grounding.provenance,
+            "news_lines_count": len(grounding.news_lines),
+        }
+
+        # ------------------------------------------------------------------
+        # STEP d: generate_personas -- LLM SUNGGUHAN
+        # ------------------------------------------------------------------
+        log(f"STEP d: get_or_generate_personas(grounding.source={grounding.source}, sectors={sectors})")
+        t0 = time.monotonic()
+        personas_result = get_or_generate_personas(
+            grounding, as_of_date=args.as_of_date, sectors=sectors, market_cap_tiers=None
+        )
+        t_d = time.monotonic() - t0
+        log(f"STEP d selesai dalam {t_d:.1f}s, success={personas_result.get('success')}")
+
+        if not personas_result.get("success"):
+            findings["step_d_status"] = "GAGAL"
+            findings["step_d_error"] = personas_result.get("error")
+            findings["step_d"] = {"elapsed_seconds": round(t_d, 1)}
+            flush_findings()
+            log("BERHENTI: generate_personas gagal.")
+            return
+
+        findings["step_d_status"] = "OK"
+        findings["step_d"] = {
+            "elapsed_seconds": round(t_d, 1),
+            "run_id": personas_result["run_id"],
+            "from_cache": personas_result.get("from_cache"),
+            "grounding": personas_result["grounding"],
+            "grounding_source": personas_result.get("grounding_source"),
+            "article_ids": personas_result.get("article_ids"),
+            "sample_articles_count": len(personas_result.get("sample_articles") or []),
+            "source_graph_id": personas_result.get("source_graph_id"),
+            "source_entity_count": personas_result.get("source_entity_count"),
+            "source_entity_names": personas_result.get("source_entity_names"),
+            "source_grounding_tokens": personas_result.get("source_grounding_tokens"),
+            "filter_method_used": personas_result.get("filter_method_used"),
+            "warnings": personas_result.get("warnings"),
+            "temperature_used": personas_result.get("temperature_used"),
+            "attempt": personas_result.get("attempt"),
+            "personas_full": personas_result["personas"],
+        }
+
+        # ------------------------------------------------------------------
+        # Cache-key check -- panggil generate_personas LAGI dengan grounding/
+        # parameter SAMA, pastikan cache-hit (TIDAK memanggil LLM lagi), dan
+        # hash-nya beda dari hash "news" untuk sektor yang sama.
+        # ------------------------------------------------------------------
+        log("CACHE CHECK: get_or_generate_personas() lagi dengan parameter identik")
+        llm_calls_before = len(_usage_log)
+        second_call = get_or_generate_personas(
+            grounding, as_of_date=args.as_of_date, sectors=sectors, market_cap_tiers=None
+        )
+        llm_calls_after = len(_usage_log)
+        news_screening = _screening_params(sectors, None, grounding_source="news")
+        zep_screening = _screening_params(sectors, None, grounding_source="zep_graph")
+        findings["cache_check"] = {
+            "second_call_from_cache": second_call.get("from_cache"),
+            "second_call_run_id_matches_first": second_call.get("run_id") == personas_result.get("run_id"),
+            "llm_calls_before": llm_calls_before,
+            "llm_calls_after": llm_calls_after,
+            "no_new_llm_call_on_cache_hit": llm_calls_after == llm_calls_before,
+            "universe_key_news": _universe_key(news_screening),
+            "universe_key_zep_graph": _universe_key(zep_screening),
+            "news_and_zep_graph_keys_differ": _universe_key(news_screening) != _universe_key(zep_screening),
+        }
+
+        # ------------------------------------------------------------------
+        # STEP e: build_oasis_artifacts -- SUNGGUHAN
+        # ------------------------------------------------------------------
+        log(f"STEP e: build_oasis_artifacts(simulation_id={sim_id})")
         t0 = time.monotonic()
         artifacts_result = build_oasis_artifacts(personas_result, simulation_id=sim_id)
-        t_artifacts = time.monotonic() - t0
-        log(f"STEP 3 selesai dalam {t_artifacts:.1f}s, success={artifacts_result.get('success')}")
+        t_e = time.monotonic() - t0
+        log(f"STEP e selesai dalam {t_e:.1f}s, success={artifacts_result.get('success')}")
 
         if not artifacts_result.get("success"):
-            findings["step3_status"] = "GAGAL"
-            findings["step3_error"] = artifacts_result.get("error")
+            findings["step_e_status"] = "GAGAL"
+            findings["step_e_error"] = artifacts_result.get("error")
             flush_findings()
             log("BERHENTI: build_oasis_artifacts gagal.")
             return
 
-        findings["step3_status"] = "OK"
+        findings["step_e_status"] = "OK"
         sim_dir = artifacts_result["sim_dir"]
         written_config = load_json(os.path.join(sim_dir, "simulation_config.json"))
         reddit_profiles = load_json(os.path.join(sim_dir, "reddit_profiles.json"))
 
-        findings["step3"] = {
-            "elapsed_seconds": round(t_artifacts, 1),
+        findings["step_e"] = {
+            "elapsed_seconds": round(t_e, 1),
             "simulation_id": sim_id,
             "sim_dir": sim_dir,
             "result_warnings": artifacts_result["warnings"],
@@ -337,15 +445,15 @@ def main():
         }
 
         if args.skip_simulation:
-            findings["step4_status"] = "DILEWATI (--skip-simulation)"
+            findings["step_f_status"] = "DILEWATI (--skip-simulation)"
             flush_findings()
             log("Selesai (skip-simulation). Findings ditulis.")
             return
 
         # ------------------------------------------------------------------
-        # STEP 4: SimulationRunner.start_simulation — SUNGGUHAN, sampai selesai
+        # STEP f: SimulationRunner.start_simulation -- SUNGGUHAN, sampai selesai
         # ------------------------------------------------------------------
-        log(f"STEP 4: SimulationRunner.start_simulation({sim_id}, platform='parallel')")
+        log(f"STEP f: SimulationRunner.start_simulation({sim_id}, platform='parallel')")
         t0 = time.monotonic()
         state = SimulationRunner.start_simulation(sim_id, platform="parallel")
         deadline = time.monotonic() + args.max_wait_seconds
@@ -368,60 +476,52 @@ def main():
                 final_status = state.runner_status
                 break
 
-        t_simulation = time.monotonic() - t0
-        log(f"STEP 4: loop polling selesai setelah {t_simulation:.1f}s, final_status={final_status}")
+        t_f = time.monotonic() - t0
+        log(f"STEP f: loop polling selesai setelah {t_f:.1f}s, final_status={final_status}")
 
-        findings["step4"] = {
-            "elapsed_seconds_until_terminal_or_timeout": round(t_simulation, 1),
+        findings["step_f"] = {
+            "elapsed_seconds_until_terminal_or_timeout": round(t_f, 1),
             "final_runner_status": final_status.value if final_status else "TIMEOUT_BELUM_TERMINAL",
             "run_state_final_in_memory": state.to_detail_dict() if state else None,
         }
 
-        # Bersihkan proses yang masih menunggu IPC (perilaku produksi normal
-        # setelah completed: producer tetap hidup untuk interview).
         try:
             stopped_state = SimulationRunner.stop_simulation(sim_id)
-            findings["step4"]["stopped_cleanly"] = True
-            findings["step4"]["run_state_after_stop"] = stopped_state.to_dict()
+            findings["step_f"]["stopped_cleanly"] = True
+            findings["step_f"]["run_state_after_stop"] = stopped_state.to_dict()
         except Exception as e:
-            findings["step4"]["stop_error"] = f"{type(e).__name__}: {e}"
+            findings["step_f"]["stop_error"] = f"{type(e).__name__}: {e}"
 
         run_state_path = os.path.join(sim_dir, "run_state.json")
         if os.path.exists(run_state_path):
-            findings["step4"]["run_state_json_file"] = load_json(run_state_path)
+            findings["step_f"]["run_state_json_file"] = load_json(run_state_path)
 
-        findings["step4"]["follow_network"] = {
+        findings["step_f"]["follow_network"] = {
             "twitter": analyze_follow_network(sim_dir, "twitter"),
             "reddit": analyze_follow_network(sim_dir, "reddit"),
         }
 
-        findings["step4_status"] = (
+        findings["step_f_status"] = (
             "BERHASIL PENUH" if final_status == RunnerStatus.COMPLETED else f"LIHAT DETAIL ({final_status})"
         )
 
         # ------------------------------------------------------------------
-        # STEP 5: actions.jsonl — ringkasan
+        # actions.jsonl -- ringkasan + cakupan ticker (poin 3 verifikasi)
         # ------------------------------------------------------------------
-        log("STEP 5: menganalisis actions.jsonl kedua platform")
-        findings["step5"] = {
+        log("Menganalisis actions.jsonl kedua platform (termasuk cakupan ticker)")
+        findings["actions_analysis"] = {
             "twitter": analyze_actions(sim_dir, "twitter"),
             "reddit": analyze_actions(sim_dir, "reddit"),
         }
 
-        # ------------------------------------------------------------------
-        # STEP 6: regresi log / twhin-bert / direktori log
-        # ------------------------------------------------------------------
-        log("STEP 6: memeriksa simulation.log untuk exception/traceback")
-        findings["step6"] = analyze_log(sim_dir)
+        log("Memeriksa simulation.log untuk exception/traceback")
+        findings["log_analysis"] = analyze_log(sim_dir)
 
-        # ------------------------------------------------------------------
-        # STEP 7: estimasi token/biaya
-        # ------------------------------------------------------------------
-        log("STEP 7: menyusun estimasi token")
+        log("Menyusun estimasi token")
         total_prompt = sum(u["prompt_tokens"] or 0 for u in _usage_log)
         total_completion = sum(u["completion_tokens"] or 0 for u in _usage_log)
         calls_missing_usage = sum(1 for u in _usage_log if u["total_tokens"] is None)
-        findings["step7"] = {
+        findings["token_usage"] = {
             "llm_calls_total": len(_usage_log),
             "llm_calls_missing_usage_field": calls_missing_usage,
             "total_prompt_tokens": total_prompt,

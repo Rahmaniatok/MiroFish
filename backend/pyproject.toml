@@ -45,6 +45,13 @@ dependencies = [
     "skfolio==1.0.6",
     "cvxpy-base>=1.9.2",
     "clarabel>=0.11.1",
+
+    # Tahap 4 (persona dari graph Zep) — AutoTokenizer untuk menghitung anggaran
+    # token grounding dengan tokenizer asli model deployment (Qwen2.5-7B-Instruct-AWQ),
+    # bukan estimasi karakter/token. Sebelumnya cuma terpasang TRANSITIF lewat
+    # sentence-transformers (camel-oasis); dideklarasikan langsung di sini supaya
+    # tidak diam-diam hilang kalau rantai dependency transitif itu berubah.
+    "transformers>=4.57.0",
 ]
 
 [project.optional-dependencies]

@@ -486,6 +486,7 @@ def test_build_universe_graph_success_path_call_order_and_contract_shape(monkeyp
         "ontology_used",
         "ingest_seconds",
         "as_of_date",
+        "graph_id",
     }
     assert result["filtered_entities"] == entities_payload
     assert result["item_count"] == 1
@@ -493,6 +494,15 @@ def test_build_universe_graph_success_path_call_order_and_contract_shape(monkeyp
     assert result["ontology_used"] == ugb.ONTOLOGY
     assert result["ingest_seconds"] >= 0
     assert result["as_of_date"] == "2026-01-15"
+
+    # Aditif Tahap 4 (docs/design/tahap4_persona_from_graph_design.md §4):
+    # graph_id historis untuk audit -- format PERSIS f"mirofish_universe_
+    # {as_of_date or 'live'}_{uuid8hex}", dan SAMA dengan graph_id yang
+    # benar-benar diteruskan ke create_graph/delete_graph (bukan nilai lain).
+    import re
+
+    assert re.fullmatch(r"mirofish_universe_2026-01-15_[0-9a-f]{8}", result["graph_id"])
+    assert result["graph_id"] == calls[0][1] == calls[-1][1]
 
     # Timeout yang dipakai HARUS sesuai compute_timeout(item_count) aktual,
     # bukan default 600.

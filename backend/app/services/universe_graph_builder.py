@@ -5,8 +5,14 @@ Mengikuti PERSIS docs/design/tahap3_zep_feed_design.md (desain sudah disetujui,
 termasuk koreksi angka waktu skenario besar ≈2,31 jam). Modul ini TIDAK
 mendesain ulang apapun — setiap keputusan (siklus hidup create+delete per run,
 fail-fast pada batch partial/failed, cakupan ticker tanpa cap, retry Finnhub
-tepat 1x tanpa backoff, kontrak output FilteredEntities bukan graph_id,
+tepat 1x tanpa backoff, kontrak output FilteredEntities sebagai payload utama,
 timeout dinamis) sudah final di dokumen desain.
+
+Aditif Tahap 4 (docs/design/tahap4_persona_from_graph_design.md §4): hasil
+sukses juga menyertakan `graph_id` sebagai string historis murni untuk audit
+— graph-nya sendiri SUDAH dihapus sebelum fungsi return (siklus hidup
+create+delete per run TIDAK berubah), jadi ID ini tidak bisa dipakai untuk
+operasi Zep apapun lagi.
 
 Referensi yang DIBACA, TIDAK diubah: graph_builder.py, app/utils/zep.py,
 news_data.py, universe.py, zep_entity_reader.py.
@@ -217,7 +223,9 @@ def build_universe_graph(
     build_zep_batch -> create_graph -> set_ontology -> add_text_batches ->
     _wait_for_batch (timeout dinamis §1) -> filter_defined_entities (BACA
     SEBELUM HAPUS) -> delete_graph (SELALU, jalur sukses maupun gagal) ->
-    return FilteredEntities ke Tahap 4 (bukan graph_id — graph sudah dihapus).
+    return FilteredEntities ke Tahap 4. `graph_id` TETAP disertakan di hasil
+    sukses sebagai string historis untuk audit (Tahap 4 §4) — graph itu
+    sendiri sudah dihapus, ID-nya TIDAK bisa dipakai untuk operasi Zep lagi.
     """
     candidates = screen_universe(sectors=sectors, market_cap_tiers=market_cap_tiers, as_of_date=as_of_date)
     tickers = [c["ticker"] for c in candidates]
@@ -337,6 +345,13 @@ def build_universe_graph(
             "ontology_used": ONTOLOGY,
             "ingest_seconds": ingest_seconds,
             "as_of_date": as_of_date,
+            # Aditif Tahap 4 (docs/design/tahap4_persona_from_graph_design.md §4):
+            # string historis MURNI untuk audit/provenance -- graph itu sendiri
+            # SUDAH dihapus di blok finally sebelum fungsi ini return, jadi ID
+            # ini TIDAK bisa dipakai untuk operasi Zep apapun lagi. Tidak ada di
+            # bentuk kontrak GAGAL manapun (kalau create_graph gagal, tidak
+            # pernah ada graph_id yang benar-benar terbentuk).
+            "graph_id": graph_id,
         }
     finally:
         # SELALU dipanggil -- jalur sukses (setelah baca entity) maupun semua
