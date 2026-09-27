@@ -23,12 +23,17 @@ from ..utils.ontology import (
 )
 from ..utils.zep import (
     ZEP_INGESTION_WAIT_TIMEOUT_SECONDS,
+    ZepApiError,
+    _retry_after_seconds,
     call_zep_read_with_retry,
     get_zep_client,
     is_retryable_zep_error,
 )
+from ..utils.logger import get_logger
 from .text_processor import TextProcessor
 from ..utils.locale import t, get_locale, set_locale
+
+logger = get_logger('mirofish.graph_builder')
 
 
 @dataclass
@@ -543,7 +548,7 @@ class GraphBuilderService:
                     episode_uuids.append(episode_uuid)
 
         try:
-            self.client.batch.process(batch_id=batch_id)
+            self._process_batch_with_rate_limit_retry(batch_id)
         except Exception as error:
             # A process response can be lost after the server accepted it.
             # Reconcile with a safe GET instead of issuing a second POST.
@@ -562,6 +567,38 @@ class GraphBuilderService:
             episode_uuids=episode_uuids,
             item_count=total_chunks,
         )
+
+    def _process_batch_with_rate_limit_retry(
+        self,
+        batch_id: str,
+        *,
+        max_attempts: int = 5,
+        max_delay: float = 90.0,
+    ) -> None:
+        """POST batch.process, retrying only on 429.
+
+        A 429 means Zep rejected the request before accepting it, so a replay
+        cannot double-process the batch. Any other error is re-raised for the
+        caller's GET-based reconciliation.
+        """
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                self.client.batch.process(batch_id=batch_id)
+                return
+            except ZepApiError as error:
+                if error.status_code != 429 or attempt == max_attempts:
+                    raise
+                retry_after = _retry_after_seconds(error)
+                delay = min(retry_after if retry_after is not None else 15.0 * attempt, max_delay)
+                logger.warning(
+                    "Zep process batch %s rate limited (attempt %s/%s); retrying in %.1fs",
+                    batch_id,
+                    attempt,
+                    max_attempts,
+                    delay,
+                )
+                time.sleep(delay)
 
     @staticmethod
     def validate_batch_chunks(chunks: List[str], *, batch_size: int = 350) -> None:
@@ -668,7 +705,8 @@ class GraphBuilderService:
 
             if status in terminal_states:
                 break
-            time.sleep(3)
+            # Zep FREE plan allows ~5 requests/minute; faster polling hits 429.
+            time.sleep(15)
 
         items = self._list_batch_items(submission.batch_id)
         if status != "succeeded":
