@@ -23,8 +23,9 @@
           <div class="step-status">
             <span v-if="statusOf(step.key) === 'completed'" class="badge success">Completed</span>
             <span v-else-if="statusOf(step.key) === 'running'" class="badge processing">Running</span>
+            <span v-else-if="statusOf(step.key) === 'paused'" class="badge accent">Paused</span>
             <span v-else-if="statusOf(step.key) === 'failed'" class="badge error">Failed</span>
-            <span v-else-if="i + 1 === run?.current_step" class="badge accent">Next</span>
+            <span v-else-if="i + 1 === uiCurrent" class="badge accent">Next</span>
             <span v-else class="badge pending">Pending</span>
           </div>
         </div>
@@ -76,14 +77,68 @@
             <p class="api-note">uploads/pipeline_runs/{{ runId }}/01_universe.json</p>
           </template>
 
+          <!-- ===== Step 02 detail ===== -->
+          <template v-else-if="step.key === 'news' && run">
+            <div v-if="newsSummary" class="kv-grid">
+              <div class="kv"><span class="k">RAW</span><span class="v">{{ newsSummary.raw?.toLocaleString() }}</span></div>
+              <div class="kv"><span class="k">RELEVANT</span><span class="v">{{ newsSummary.relevant?.toLocaleString() }}</span></div>
+              <div class="kv"><span class="k">IN TXT</span><span class="v">{{ newsSummary.kept }} <small>(cap {{ newsSummary.cap }})</small></span></div>
+              <div class="kv"><span class="k">TXT SIZE</span><span class="v">{{ Math.round(newsSummary.bytes / 1024) }} KB</span></div>
+            </div>
+            <div class="next-box" :class="{ done: statusOf('news') === 'completed' }">
+              <span v-if="seedDone">txt_berita is locked — it is the reality seed of the MiroFish run.</span>
+              <span v-else-if="statusOf('news') === 'completed'">txt_berita is ready. Review it and use it as the reality seed in the News Room.</span>
+              <span v-else-if="statusOf('news') === 'pending'">Fetch 90 days of Finnhub news for every ticker.</span>
+              <span v-else>News fetch is {{ statusOf('news') }} — continue in the News Room.</span>
+              <router-link class="action-btn" :to="`/pipeline/${runId}/news`">Open News Room →</router-link>
+            </div>
+            <p v-if="newsSummary" class="api-note">uploads/pipeline_runs/{{ runId }}/02_news/txt_berita.txt</p>
+          </template>
+
+          <!-- ===== Step 03 detail: reality seed / prompt / simulation ===== -->
+          <template v-else-if="step.key === 'mirofish' && run">
+            <div class="sub-steps">
+              <div class="sub" :class="run.steps.seed.status">
+                <span class="sub-dot"></span>
+                <span class="sub-name">Reality seed</span>
+                <span v-if="seedSummary" class="sub-val">
+                  {{ seedSummary.filename }} · {{ Math.round(seedSummary.bytes / 1024) }} KB → {{ seedSummary.project_id }}
+                </span>
+                <router-link v-else-if="statusOf('news') === 'completed'" class="sub-link" :to="`/pipeline/${runId}/news`">feed from News Room →</router-link>
+                <span v-else class="sub-val muted">waits for txt_berita</span>
+              </div>
+              <div class="sub" :class="run.steps.prompt.status">
+                <span class="sub-dot"></span>
+                <span class="sub-name">Simulation prompt</span>
+                <span v-if="promptSummary" class="sub-val">
+                  {{ promptSummary.news_label }} · {{ promptSummary.chars.toLocaleString() }} chars → {{ promptSummary.project_id }}
+                </span>
+                <span v-else class="sub-val muted">built from ticker_universe after the seed</span>
+              </div>
+              <details v-if="promptText" class="prompt-box">
+                <summary>View simulation prompt</summary>
+                <pre>{{ promptText }}</pre>
+              </details>
+              <div v-for="st in mirofishStages" :key="st.key" class="sub" :class="st.status">
+                <span class="sub-dot"></span>
+                <span class="sub-name">{{ st.label }}</span>
+                <span class="sub-val" :class="{ muted: st.status === 'pending' }">{{ st.detail }}</span>
+              </div>
+            </div>
+            <div v-if="run.steps.prompt.status === 'completed'" class="next-box" :class="{ done: statusOf('mirofish') === 'completed' }">
+              <span>{{ mirofishHint }}</span>
+              <button class="action-btn" @click="openMirofish">{{ mirofishTarget.label }} →</button>
+            </div>
+          </template>
+
           <!-- ===== Not built yet ===== -->
           <template v-else-if="statusOf(step.key) === 'pending'">
-            <div v-if="i + 1 === run?.current_step" class="next-box">
+            <div v-if="i + 1 === uiCurrent" class="next-box">
               <span>This step is next. It will be available once it is built.</span>
               <button class="action-btn" disabled>Run step {{ String(i + 1).padStart(2, '0') }} →</button>
             </div>
           </template>
-          <div v-if="run?.steps?.[step.key]?.error" class="note error">{{ run.steps[step.key].error }}</div>
+          <div v-if="uiStepError(run?.steps, step)" class="note error">{{ uiStepError(run?.steps, step) }}</div>
         </div>
       </div>
     </div>
@@ -108,7 +163,10 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import PipelineStepRail from './PipelineStepRail.vue'
-import { PIPELINE_STEPS } from './pipelineSteps'
+import { PIPELINE_STEPS, uiStepStatus, uiCurrentStep, uiStepError } from './pipelineSteps'
+import { useRouter } from 'vue-router'
+import { getPrompt } from '../../api/pipeline'
+import { rememberPipelineRun } from '../../store/pipelineReturn'
 import { formatMarketCap } from '../../utils/universeGraph'
 
 const props = defineProps({
@@ -121,6 +179,10 @@ const logContent = ref(null)
 
 const universe = computed(() => props.run?.universe || null)
 const summary = computed(() => props.run?.steps?.universe?.summary || {})
+const newsSummary = computed(() => {
+  const s = props.run?.steps?.news
+  return s?.status === 'completed' ? s.summary : null
+})
 const newsWindow = computed(() => {
   if (!universe.value) return '—'
   const d = new Date(universe.value.as_of_date)
@@ -128,12 +190,67 @@ const newsWindow = computed(() => {
   return `${d.toISOString().slice(0, 10)} → ${universe.value.as_of_date}`
 })
 
-const statusOf = (key) => props.run?.steps?.[key]?.status || 'pending'
+const seedSummary = computed(() => props.run?.steps?.seed?.status === 'completed' ? props.run.steps.seed.summary : null)
+const seedDone = computed(() => !!seedSummary.value)
+const router = useRouter()
+
+// ---- step 5: MiroFish progress (synced from project / simulation / report files) ----
+const mf = computed(() => props.run?.steps?.simulation?.summary || {})
+const mirofishStages = computed(() => {
+  const s = mf.value.stages || {}
+  const rounds = mf.value.total_rounds ? `round ${mf.value.current_round || 0}/${mf.value.total_rounds}` : ''
+  return [
+    { key: 'ontology', label: 'Ontology', status: s.ontology || 'pending',
+      detail: s.ontology === 'completed' ? 'generated from seed + prompt' : 'LLM reads the seed + prompt' },
+    { key: 'graph', label: 'Knowledge graph (Zep)', status: s.graph || 'pending',
+      detail: mf.value.graph_id || (s.graph === 'running' ? 'building…' : 'built from txt_berita chunks') },
+    { key: 'simulation', label: 'Agents & simulation', status: s.simulation || 'pending',
+      detail: mf.value.simulation_id ? [mf.value.simulation_id, rounds].filter(Boolean).join(' · ') : 'env setup + OASIS rounds' },
+    { key: 'report', label: 'Report', status: s.report || 'pending',
+      detail: mf.value.report_id ? `${mf.value.report_id} · ${mf.value.report_status}` : 'MiroFish report agent' }
+  ]
+})
+// furthest page of the original MiroFish flow for this project
+const mirofishTarget = computed(() => {
+  const s = mf.value.stages || {}
+  if (mf.value.report_id) return { label: 'Open MiroFish report', path: `/report/${mf.value.report_id}` }
+  if (mf.value.simulation_id) {
+    const started = ['running', 'completed', 'stopped', 'paused'].includes(mf.value.runner_status) || s.simulation === 'completed'
+    return { label: 'Open MiroFish simulation', path: started ? `/simulation/${mf.value.simulation_id}/start` : `/simulation/${mf.value.simulation_id}` }
+  }
+  const pid = props.run?.links?.project_id
+  return { label: s.ontology === 'completed' ? 'Continue in MiroFish' : 'Start MiroFish', path: `/process/${pid}` }
+})
+const mirofishHint = computed(() => {
+  const s = mf.value.stages || {}
+  if (s.report === 'completed') return 'MiroFish report is ready — step 04 converts it to JSON.'
+  if (Object.values(s).includes('failed')) return `A MiroFish stage failed${mf.value.error ? ': ' + mf.value.error : ''}. Open MiroFish to retry.`
+  if (!s.ontology || s.ontology === 'pending') return 'Seed and prompt are on the project. Run it in the original MiroFish UI: ontology → graph → env setup → simulation → report.'
+  return 'Continue in MiroFish; progress here updates automatically.'
+})
+const openMirofish = () => {
+  rememberPipelineRun(props.runId, props.run?.name)
+  router.push(mirofishTarget.value.path)
+}
+const promptSummary = computed(() => props.run?.steps?.prompt?.status === 'completed' ? props.run.steps.prompt.summary : null)
+const promptText = ref('')
+watch(promptSummary, async (s) => {
+  if (!s || promptText.value) return
+  try {
+    promptText.value = (await getPrompt(props.runId)).data.text || ''
+  } catch {
+    promptText.value = ''
+  }
+}, { immediate: true })
+const uiCurrent = computed(() => uiCurrentStep(props.run))
+
+// status of a UI step (aggregated over its backend steps)
+const statusOf = (key) => uiStepStatus(props.run?.steps, PIPELINE_STEPS.find(s => s.key === key))
 const cardClass = (key, num) => ({
   completed: statusOf(key) === 'completed',
-  active: statusOf(key) === 'running' || (statusOf(key) === 'pending' && num === props.run?.current_step),
+  active: ['running', 'paused'].includes(statusOf(key)) || (statusOf(key) === 'pending' && num === uiCurrent.value),
   failed: statusOf(key) === 'failed',
-  dim: statusOf(key) === 'pending' && num !== props.run?.current_step
+  dim: statusOf(key) === 'pending' && num !== uiCurrent.value
 })
 
 watch(() => props.logs.length, async () => {
@@ -268,6 +385,28 @@ i.tier-small { background: #BDBDBD; }
   white-space: nowrap;
 }
 .action-btn:disabled { background: #CCC; cursor: not-allowed; }
+a.action-btn { text-decoration: none; }
+a.action-btn:hover { background: #FF5722; }
+.next-box.done { background: #F6FBF6; border-color: #A5D6A7; color: #2E7D32; }
+.v small { font-size: 10px; color: #999; }
+.sub-steps { display: flex; flex-direction: column; gap: 6px; }
+.sub { display: flex; align-items: center; gap: 10px; background: #F9F9F9; border-radius: 5px; padding: 8px 10px; font-size: 12px; }
+.sub-dot { width: 8px; height: 8px; border-radius: 50%; background: #DDD; flex-shrink: 0; }
+.sub.completed .sub-dot { background: #4CAF50; }
+.sub.running .sub-dot { background: #FF5722; animation: pulse 1s infinite; }
+.sub.failed .sub-dot { background: #F44336; }
+.sub-name { font-weight: 600; white-space: nowrap; }
+.sub-val { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #333; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub-val.muted { color: #AAA; }
+.sub-link { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #FF5722; text-decoration: none; font-weight: 700; }
+@keyframes pulse { 50% { opacity: 0.4; } }
+.prompt-box { margin-top: 2px; font-size: 11.5px; }
+.prompt-box summary { cursor: pointer; font-weight: 600; color: #FF5722; padding: 4px 2px; }
+.prompt-box pre {
+  margin-top: 6px; background: #0B0B0B; color: #DDD; border-radius: 6px; padding: 12px 14px;
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow-y: auto;
+}
 
 .system-logs {
   background: #000;

@@ -14,7 +14,7 @@
     <!-- Hero -->
     <header class="hero">
       <div class="hero-text">
-        <div class="eyebrow"><span class="orange-sq"></span> STEP 01 / 08</div>
+        <div class="eyebrow"><span class="orange-sq"></span> STEP 01 / 06</div>
         <h1 class="hero-title">Build the <span class="accent">ticker universe</span></h1>
         <p class="hero-desc">
           Filter the S&amp;P 500 by GICS sector and market-cap tier at an <code>as_of</code> date.
@@ -232,7 +232,7 @@
           </div>
           <button class="lock-btn" :disabled="!canLock || locking" @click="lockUniverse">
             <span v-if="locking" class="spinner light"></span>
-            LOCK UNIVERSE &amp; OPEN WORKSPACE →
+            LOCK UNIVERSE &amp; FETCH NEWS →
           </button>
         </div>
         <div v-if="lockError" class="msg error">{{ lockError }}</div>
@@ -247,7 +247,7 @@
       </div>
       <div v-if="!runs.length" class="history-empty">No runs yet.</div>
       <div class="run-grid">
-        <div v-for="run in runs" :key="run.run_id" class="run-card" @click="router.push(`/pipeline/${run.run_id}`)">
+        <div v-for="run in runs" :key="run.run_id" class="run-card" @click="openRun(run)">
           <div class="run-top">
             <span class="run-name">{{ run.name }}</span>
             <span class="run-status" :class="run.status">{{ run.status.replace('_', ' ') }}</span>
@@ -261,7 +261,7 @@
           <PipelineStepRail :steps="run.steps" compact />
           <div class="run-foot">
             <span>{{ run.run_id }}</span>
-            <span class="resume">{{ run.status === 'completed' ? 'Open' : `Resume at step ${run.current_step}` }} →</span>
+            <span class="resume">{{ run.status === 'completed' ? 'Open' : `Resume at step ${uiCurrentStep(run)}` }} →</span>
           </div>
         </div>
       </div>
@@ -273,6 +273,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PipelineStepRail from '../../components/pipeline/PipelineStepRail.vue'
+import { uiCurrentStep } from '../../components/pipeline/pipelineSteps'
 import { formatMarketCap } from '../../utils/universeGraph'
 import {
   getUniverseOptions, validateAsOf, getConstituents,
@@ -524,7 +525,7 @@ const lockUniverse = async () => {
       market_cap_tiers: selectedTiers.value,
       excluded_tickers: [...excluded.value]
     })
-    router.push(`/pipeline/${res.data.run_id}`)
+    router.push(`/pipeline/${res.data.run_id}/news`)
   } catch (e) {
     lockError.value = e.message
   } finally {
@@ -554,6 +555,9 @@ watch([sectorsKey, asOf, asOfError], () => {
   }
   scheduleAutoScreen()
 })
+
+// News Room until txt_berita is fed as the reality seed; the workspace after that
+const openRun = (run) => router.push(run.steps?.seed?.status !== 'completed' ? `/pipeline/${run.run_id}/news` : `/pipeline/${run.run_id}`)
 
 const scrollToHistory = () => historyRef.value?.scrollIntoView({ behavior: 'smooth' })
 

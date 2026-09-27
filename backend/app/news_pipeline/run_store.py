@@ -43,6 +43,7 @@ STEP_PENDING = "pending"
 STEP_RUNNING = "running"
 STEP_COMPLETED = "completed"
 STEP_FAILED = "failed"
+STEP_PAUSED = "paused"          # stopped by the user; resumable
 
 RUN_IN_PROGRESS = "in_progress"
 RUN_COMPLETED = "completed"
@@ -175,6 +176,14 @@ def read_artifact(run_id: str, filename: str) -> Any:
         return json.load(f) if filename.endswith('.json') else f.read()
 
 
+def patch_step(run_id: str, step_key: str, **fields: Any) -> Dict[str, Any]:
+    """Update a step's fields (e.g. summary) without touching its status or the log."""
+    with _lock:
+        manifest = load_run(run_id)
+        manifest["steps"][step_key].update(fields)
+        return save_run(manifest)
+
+
 def update_step(run_id: str, step_key: str, status: str, **fields: Any) -> Dict[str, Any]:
     """Set one step's status (+ artifact/summary/error) and keep run-level status in sync."""
     with _lock:
@@ -198,6 +207,7 @@ def update_step(run_id: str, step_key: str, status: str, **fields: Any) -> Dict[
             manifest["current_step"] = manifest["steps"][first_open]["index"]
             manifest["status"] = RUN_FAILED if status == STEP_FAILED else RUN_IN_PROGRESS
         save_run(manifest)
-    append_log(run_id, f"step_{status}", f"Step {step['index']} ({step['title']}): {status}",
+    # no step number here: the UI merges some backend steps, so numbers would disagree
+    append_log(run_id, f"step_{status}", f"{step['title']}: {status}",
                {"step": step_key, **({"error": fields["error"]} if fields.get("error") else {})})
     return manifest

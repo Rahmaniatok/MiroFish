@@ -1,0 +1,33 @@
+Stock universe (MANDATORY — only select from these {n_tickers} tickers, do not go outside this list):
+ {ticker_list}
+Build 8 FIXED investor persona agents (do not generate any personas outside these 8),
+ with the following definitions:
+Value Investor — focuses on cheap valuations relative to fundamentals (P/E, P/B, margin of safety), skeptical of hype.
+Growth Investor — chases high revenue/earnings growth, tolerant of expensive valuations if the narrative is strong.
+Momentum Trader — reacts quickly to short-term price & volume trends.
+Contrarian/Skeptic — looks for signals against the crowd, suspicious of consensus & news euphoria.
+Macro Strategist — evaluates through the lens of interest rates, inflation, economic cycles, policy (including {macro_policy}).
+Technical Analyst — relies on chart patterns and technical indicators, disregards fundamentals.
+ESG/Sustainability Investor — considers governance & social impact in addition to financial figures.
+Risk Manager/Quant — based on quantitative models, volatility, portfolio correlations, systemic risk.
+Requested prediction:
+ For the 4–6 week horizon following the end of the news period ({as_of_long}),
+ simulate how each persona reacts to the attached {news_label} news,
+ and determine {pick_range} stocks (from the all tickers above) that each persona most recommends
+ accumulating, based on the results of the simulated debate/social interaction
+ (not generic opinions outside the context of this news).
+Once the simulation is complete, synthesize the results into TWO forms:
+ (a) the native MiroFish report/verdict as usual (with a confidence score per signal)
+ (b) an additional summary in exactly the following JSON format:
+{{
+  "personas": [
+    {{ "persona": "Value Investor", "tickers": ["XXX", "YYY"] }},
+    {{ "persona": "Growth Investor", "tickers": ["XXX", "YYY"] }},
+    {{ "persona": "Momentum Trader", "tickers": ["XXX", "YYY"] }},
+    {{ "persona": "Contrarian/Skeptic", "tickers": ["XXX", "YYY"] }},
+    {{ "persona": "Macro Strategist", "tickers": ["XXX", "YYY"] }},
+    {{ "persona": "Technical Analyst", "tickers": ["XXX", "YYY"] }},
+    {{ "persona": "ESG/Sustainability Investor", "tickers": ["XXX", "YYY"] }},
+    {{ "persona": "Risk Manager/Quant", "tickers": ["XXX", "YYY"] }}
+  ]
+}}

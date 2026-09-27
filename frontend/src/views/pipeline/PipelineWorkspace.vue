@@ -22,8 +22,8 @@
 
       <div class="header-right">
         <div class="workflow-step" v-if="run">
-          <span class="step-num">Step {{ run.current_step }}/8</span>
-          <span class="step-name">{{ PIPELINE_STEPS[run.current_step - 1]?.title }}</span>
+          <span class="step-num">Step {{ uiStep }}/{{ PIPELINE_STEPS.length }}</span>
+          <span class="step-name">{{ PIPELINE_STEPS[uiStep - 1]?.title }}</span>
         </div>
         <div class="step-divider"></div>
         <span class="status-indicator" :class="statusClass">
@@ -40,7 +40,7 @@
           :loading="loading"
           :currentPhase="2"
           :edgeLabelsDefault="false"
-          @refresh="loadRun"
+          @refresh="refreshAll"
           @toggle-maximize="toggleMaximize('graph')"
         />
       </div>
@@ -52,13 +52,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import GraphPanel from '../../components/GraphPanel.vue'
 import PipelineWorkbench from '../../components/pipeline/PipelineWorkbench.vue'
-import { PIPELINE_STEPS } from '../../components/pipeline/pipelineSteps'
+import { PIPELINE_STEPS, uiCurrentStep } from '../../components/pipeline/pipelineSteps'
 import { universeToGraphData } from '../../utils/universeGraph'
 import { getRun, getRunLog } from '../../api/pipeline'
+import { getGraphData } from '../../api/graph'
 
 const props = defineProps({ runId: { type: String, required: true } })
 const router = useRouter()
@@ -69,8 +70,23 @@ const logs = ref([])
 const loading = ref(false)
 const error = ref('')
 
-// Until step 3 builds the Zep graph, show the universe (sector / tier) graph.
-const graphData = computed(() => universeToGraphData(run.value?.universe))
+// Universe (sector / tier) graph until MiroFish has built the Zep graph, then the real one.
+const uiStep = computed(() => uiCurrentStep(run.value))
+const zepGraph = ref(null)
+const graphData = computed(() => zepGraph.value || universeToGraphData(run.value?.universe))
+const graphId = computed(() => run.value?.steps?.simulation?.summary?.stages?.graph === 'completed'
+  ? run.value?.links?.graph_id : null)
+
+const loadZepGraph = async () => {
+  if (!graphId.value) return
+  try {
+    const res = await getGraphData(graphId.value)
+    zepGraph.value = res.data
+  } catch (e) {
+    logs.value = [...logs.value, { time: new Date().toISOString(), event: 'graph_error', message: e.message }]
+  }
+}
+watch(graphId, (id, old) => { if (id && id !== old) loadZepGraph() })
 
 const leftPanelStyle = computed(() => {
   if (viewMode.value === 'graph') return { width: '100%', opacity: 1, transform: 'translateX(0)' }
@@ -94,6 +110,11 @@ const statusText = computed(() => {
   return { in_progress: 'In progress', completed: 'Completed', failed: 'Failed' }[run.value.status] || run.value.status
 })
 
+const refreshAll = async () => {
+  await loadRun()
+  await loadZepGraph()
+}
+
 const toggleMaximize = (target) => {
   viewMode.value = viewMode.value === target ? 'split' : target
 }
@@ -113,7 +134,25 @@ const loadRun = async () => {
   }
 }
 
-onMounted(loadRun)
+// while MiroFish runs (in another tab or later today), keep the card in sync
+let timer = null
+const mirofishActive = computed(() => {
+  const s = run.value?.steps
+  return s?.prompt?.status === 'completed' && s?.simulation?.status !== 'completed'
+})
+const schedule = () => {
+  clearTimeout(timer)
+  timer = setTimeout(async () => {
+    if (mirofishActive.value && !document.hidden) await loadRun()
+    schedule()
+  }, 5000)
+}
+
+onMounted(async () => {
+  await loadRun()
+  schedule()
+})
+onUnmounted(() => clearTimeout(timer))
 </script>
 
 <style scoped>

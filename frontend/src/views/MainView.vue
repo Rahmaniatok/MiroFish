@@ -83,7 +83,7 @@ import { useI18n } from 'vue-i18n'
 import GraphPanel from '../components/GraphPanel.vue'
 import Step1GraphBuild from '../components/Step1GraphBuild.vue'
 import Step2EnvSetup from '../components/Step2EnvSetup.vue'
-import { generateOntology, getProject, buildGraph, getTaskStatus, getGraphData } from '../api/graph'
+import { generateOntology, generateOntologyForProject, getProject, buildGraph, getTaskStatus, getGraphData } from '../api/graph'
 import { getPendingUpload, clearPendingUpload } from '../store/pendingUpload'
 import LanguageSwitcher from '../components/LanguageSwitcher.vue'
 
@@ -241,7 +241,11 @@ const loadProject = async () => {
       updatePhaseByStatus(res.data.status)
       addLog(`Project loaded. Status: ${res.data.status}`)
       
-      if (res.data.status === 'ontology_generated' && !res.data.graph_id) {
+      if (['created', 'failed'].includes(res.data.status) && !res.data.ontology && res.data.simulation_requirement) {
+        // Project prepared without an upload (news pipeline: seed + prompt stored
+        // on the project) — generate its ontology, then build as usual.
+        await generateExistingOntology()
+      } else if (res.data.status === 'ontology_generated' && !res.data.graph_id) {
         await startBuildGraph()
       } else if (res.data.status === 'graph_building' && res.data.graph_build_task_id) {
         currentPhase.value = 1
@@ -259,6 +263,47 @@ const loadProject = async () => {
     addLog(`Exception in loadProject: ${err.message}`)
   } finally {
     loading.value = false
+  }
+}
+
+// Ontology for a project prepared without an upload (news pipeline). Runs as a
+// backend task: the LLM can take longer than one request's timeout.
+const generateExistingOntology = async () => {
+  error.value = ''
+  currentPhase.value = 0
+  ontologyProgress.value = { message: 'Analyzing reality seed...' }
+  addLog('Generating ontology from the stored reality seed and simulation prompt...')
+  try {
+    const res = await generateOntologyForProject(currentProjectId.value)
+    if (!res.data.task_id) {
+      // already generated
+      projectData.value = { ...projectData.value, ...res.data }
+      ontologyProgress.value = null
+      await startBuildGraph()
+      return
+    }
+    addLog(`Ontology task started. Task ID: ${res.data.task_id}`)
+    let lastMessage = ''
+    while (true) {
+      await new Promise(r => setTimeout(r, 3000))
+      const task = (await getTaskStatus(res.data.task_id)).data
+      if (task.message && task.message !== lastMessage) {
+        lastMessage = task.message
+        ontologyProgress.value = { message: task.message }
+        addLog(task.message)
+      }
+      if (task.status === 'completed') break
+      if (task.status === 'failed') throw new Error(task.error || 'Ontology generation failed')
+    }
+    const projectRes = await getProject(currentProjectId.value)
+    projectData.value = projectRes.data
+    ontologyProgress.value = null
+    addLog(`Ontology generated successfully for project ${currentProjectId.value}`)
+    await startBuildGraph()
+  } catch (err) {
+    ontologyProgress.value = null
+    error.value = err.message
+    addLog(`Error generating ontology: ${err.message}`)
   }
 }
 

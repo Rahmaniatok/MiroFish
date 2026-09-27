@@ -64,3 +64,15 @@ export function getProject(projectId) {
     method: 'get'
   })
 }
+
+/**
+ * 为已有项目生成本体（新闻流水线：reality seed 与 simulation_requirement 已存于项目中）
+ * @param {String} projectId
+ * @returns {Promise}
+ */
+export function generateOntologyForProject(projectId) {
+  return service({
+    url: `/api/graph/project/${projectId}/ontology`,
+    method: 'post'
+  })
+}

@@ -4,7 +4,7 @@
       v-for="(step, i) in PIPELINE_STEPS"
       :key="step.key"
       class="rail-step"
-      :class="statusOf(step.key, i + 1)"
+      :class="statusOf(step, i + 1)"
       :title="`${String(i + 1).padStart(2, '0')} · ${step.title}`"
     >
       <span class="rail-num">{{ String(i + 1).padStart(2, '0') }}</span>
@@ -15,7 +15,7 @@
 </template>
 
 <script setup>
-import { PIPELINE_STEPS } from './pipelineSteps'
+import { PIPELINE_STEPS, uiStepStatus, uiCurrentStep } from './pipelineSteps'
 
 const props = defineProps({
   // run manifest `steps` object ({key: {status}}); omit on the builder page
@@ -25,19 +25,14 @@ const props = defineProps({
   compact: { type: Boolean, default: false }
 })
 
-const statusOf = (key, num) => {
-  const status = props.steps?.[key]?.status
+const statusOf = (step, num) => {
+  if (!props.steps) return num === props.active ? 'running' : 'pending'
+  const status = uiStepStatus(props.steps, step)
   if (status === 'completed') return 'done'
   if (status === 'running') return 'running'
   if (status === 'failed') return 'failed'
-  if (!props.steps && num === props.active) return 'running'
-  if (props.steps && num === firstOpen()) return 'next'
+  if (status === 'paused' || num === uiCurrentStep({ steps: props.steps })) return 'next'
   return 'pending'
-}
-
-const firstOpen = () => {
-  const i = PIPELINE_STEPS.findIndex(s => props.steps?.[s.key]?.status !== 'completed')
-  return i === -1 ? null : i + 1
 }
 </script>
 
@@ -45,7 +40,7 @@ const firstOpen = () => {
 .step-rail {
   list-style: none;
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 6px;
   width: 100%;
 }

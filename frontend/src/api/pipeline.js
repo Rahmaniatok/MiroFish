@@ -49,3 +49,50 @@ export function getRun(runId) {
 export function getRunLog(runId, limit) {
   return service({ url: `/api/pipeline/runs/${runId}/log`, method: 'get', params: limit ? { limit } : {} })
 }
+
+// ---- step 2: news ----
+
+/** News step status: per-ticker progress + stats, live fetch info, txt meta */
+export function getNewsStatus(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/news`, method: 'get' })
+}
+
+/** Start or resume the Finnhub fetch (already-fetched tickers are skipped) */
+export function startNews(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/news/start`, method: 'post' })
+}
+
+export function pauseNews(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/news/pause`, method: 'post' })
+}
+
+/** Articles of one ticker with keep/drop decision; view = 'all' | 'kept' */
+export function getNewsArticles(runId, ticker, view = 'all') {
+  return service({ url: `/api/pipeline/runs/${runId}/news/articles`, method: 'get', params: { ticker, view } })
+}
+
+/** Rebuild txt_berita with another per-ticker cap (no refetch) */
+export function compactNews(runId, cap) {
+  return service({ url: `/api/pipeline/runs/${runId}/news/compact`, method: 'post', data: { cap } })
+}
+
+export function getNewsTxt(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/news/txt`, method: 'get' })
+}
+
+export const newsTxtDownloadUrl = (runId) =>
+  `${service.defaults.baseURL}/api/pipeline/runs/${runId}/news/txt?download=1`
+
+// ---- step 3: reality seed ----
+
+/** Feed txt_berita into a MiroFish project as its reality seed (idempotent) */
+export function feedSeed(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/seed`, method: 'post' })
+}
+
+// ---- step 4: simulation prompt ----
+
+/** The simulation prompt (simulation_requirement) built from ticker_universe */
+export function getPrompt(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/prompt`, method: 'get' })
+}
