@@ -33,6 +33,14 @@ dependencies = [
     # 工具库
     "python-dotenv>=1.0.0",
     "pydantic>=2.0.0",
+
+    # News pipeline data layer (S&P 500 universe, prices, Finnhub news)
+    "yfinance>=0.2.40",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "lxml>=5.0.0",
+    "requests>=2.31.0",
+    "python-dateutil>=2.8.0",
 ]
 
 [project.optional-dependencies]

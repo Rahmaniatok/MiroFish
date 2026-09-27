@@ -243,7 +243,9 @@ const props = defineProps({
   graphData: Object,
   loading: Boolean,
   currentPhase: Number,
-  isSimulating: Boolean
+  isSimulating: Boolean,
+  // optional: start with edge labels hidden (dense graphs, e.g. news pipeline universe)
+  edgeLabelsDefault: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['refresh', 'toggle-maximize'])
@@ -251,7 +253,7 @@ const emit = defineEmits(['refresh', 'toggle-maximize'])
 const graphContainer = ref(null)
 const graphSvg = ref(null)
 const selectedItem = ref(null)
-const showEdgeLabels = ref(true) // 默认显示边标签
+const showEdgeLabels = ref(props.edgeLabelsDefault) // 默认显示边标签
 const expandedSelfLoops = ref(new Set()) // 展开的自环项
 const showSimulationFinishedHint = ref(false) // 模拟结束后的提示
 const wasSimulating = ref(false) // 追踪之前是否在模拟中
