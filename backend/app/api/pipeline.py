@@ -7,7 +7,8 @@ app/news_pipeline/run_store.py. Responses follow the project convention
 from flask import Response, jsonify, request
 
 from . import pipeline_bp
-from ..news_pipeline import run_store, step1_universe, step2_news, step3_seed, step4_prompt, step5_mirofish
+from ..news_pipeline import (run_store, step1_universe, step2_news, step3_seed, step4_prompt,
+                             step5_mirofish, step6_report_json, step7_consensus, step8_performance)
 from ..utils.logger import get_logger
 
 logger = get_logger('mirofish.api.pipeline')
@@ -123,7 +124,7 @@ def _news_call(fn, *args):
         return _err(f"Run not found: {e}", 404)
     except LookupError as e:
         return _err(str(e), 404)
-    except step2_news.JobConflictError as e:
+    except (step2_news.JobConflictError, step6_report_json.JobConflictError) as e:
         return _err(str(e), 409)
     except ValueError as e:
         return _err(str(e))
@@ -197,4 +198,56 @@ def prompt_get(run_id):
 def prompt_build(run_id):
     """(Re)build the simulation prompt from ticker_universe."""
     return _news_call(step4_prompt.build_prompt, run_id)
+
+
+# ---------------------------------------------------------------- step 6 ----
+
+@pipeline_bp.route('/runs/<run_id>/report-json', methods=['GET'])
+def report_json_status(run_id):
+    return _news_call(step6_report_json.status, run_id)
+
+
+@pipeline_bp.route('/runs/<run_id>/report-json', methods=['POST'])
+def report_json_start(run_id):
+    """Convert the completed MiroFish report into the persona JSON (background LLM job)."""
+    return _news_call(step6_report_json.start, run_id)
+
+
+# ---------------------------------------------------------------- step 7 ----
+
+@pipeline_bp.route('/runs/<run_id>/consensus', methods=['GET'])
+def consensus_get(run_id):
+    return _news_call(step7_consensus.get, run_id)
+
+
+@pipeline_bp.route('/runs/<run_id>/consensus', methods=['POST'])
+def consensus_build(run_id):
+    """(Re)compute the consensus: persona votes, top n, ties at the cutoff included."""
+    body = request.get_json(silent=True) or {}
+    try:
+        n = int(body.get('n') or step7_consensus.DEFAULT_N)
+        min_votes = int(body.get('min_votes') or step7_consensus.DEFAULT_MIN_VOTES)
+    except (TypeError, ValueError):
+        return _err("n and min_votes must be whole numbers")
+    return _news_call(step7_consensus.build, run_id, n, min_votes)
+
+
+# ---------------------------------------------------------------- step 8 ----
+
+@pipeline_bp.route('/runs/<run_id>/performance', methods=['GET'])
+def performance_get(run_id):
+    return _news_call(step8_performance.get, run_id)
+
+
+@pipeline_bp.route('/runs/<run_id>/performance', methods=['POST'])
+def performance_build(run_id):
+    """(Re)build the performance report with prices up to today (yfinance)."""
+    def build_and_get(rid):
+        step8_performance.build(rid)
+        return step8_performance.get(rid)
+    try:
+        return _news_call(build_and_get, run_id)
+    except Exception as e:  # noqa: BLE001  (yfinance / network)
+        logger.exception("performance build failed")
+        return _err(f"Performance build failed: {e}", 502)
 

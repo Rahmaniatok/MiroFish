@@ -45,7 +45,7 @@
         />
       </div>
       <div class="panel-wrapper right" :style="rightPanelStyle">
-        <PipelineWorkbench :runId="runId" :run="run" :logs="logs" />
+        <PipelineWorkbench :runId="runId" :run="run" :logs="logs" @refresh-run="loadRun" />
       </div>
     </main>
   </div>

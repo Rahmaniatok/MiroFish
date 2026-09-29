@@ -83,7 +83,7 @@
               <div class="kv"><span class="k">RAW</span><span class="v">{{ newsSummary.raw?.toLocaleString() }}</span></div>
               <div class="kv"><span class="k">RELEVANT</span><span class="v">{{ newsSummary.relevant?.toLocaleString() }}</span></div>
               <div class="kv"><span class="k">IN TXT</span><span class="v">{{ newsSummary.kept }} <small>(cap {{ newsSummary.cap }})</small></span></div>
-              <div class="kv"><span class="k">TXT SIZE</span><span class="v">{{ Math.round(newsSummary.bytes / 1024) }} KB</span></div>
+              <div class="kv"><span class="k">TXT SIZE</span><span class="v">{{ Math.round((newsSummary.bytes || 0) / 1024) }} KB</span></div>
             </div>
             <div class="next-box" :class="{ done: statusOf('news') === 'completed' }">
               <span v-if="seedDone">txt_berita is locked — it is the reality seed of the MiroFish run.</span>
@@ -102,7 +102,7 @@
                 <span class="sub-dot"></span>
                 <span class="sub-name">Reality seed</span>
                 <span v-if="seedSummary" class="sub-val">
-                  {{ seedSummary.filename }} · {{ Math.round(seedSummary.bytes / 1024) }} KB → {{ seedSummary.project_id }}
+                  {{ seedSummary.filename }} · {{ Math.round((seedSummary.bytes || 0) / 1024) }} KB → {{ seedSummary.project_id }}
                 </span>
                 <router-link v-else-if="statusOf('news') === 'completed'" class="sub-link" :to="`/pipeline/${runId}/news`">feed from News Room →</router-link>
                 <span v-else class="sub-val muted">waits for txt_berita</span>
@@ -111,7 +111,7 @@
                 <span class="sub-dot"></span>
                 <span class="sub-name">Simulation prompt</span>
                 <span v-if="promptSummary" class="sub-val">
-                  {{ promptSummary.news_label }} · {{ promptSummary.chars.toLocaleString() }} chars → {{ promptSummary.project_id }}
+                  {{ promptSummary.news_label }} · {{ (promptSummary.chars || 0).toLocaleString() }} chars → {{ promptSummary.project_id }}
                 </span>
                 <span v-else class="sub-val muted">built from ticker_universe after the seed</span>
               </div>
@@ -127,7 +127,41 @@
             </div>
             <div v-if="run.steps.prompt.status === 'completed'" class="next-box" :class="{ done: statusOf('mirofish') === 'completed' }">
               <span>{{ mirofishHint }}</span>
-              <button class="action-btn" @click="openMirofish">{{ mirofishTarget.label }} →</button>
+              <button class="action-btn" :disabled="mirofishTarget.disabled || reportBusy" @click="openMirofish">
+                {{ reportBusy ? 'Starting report…' : mirofishTarget.label }}<template v-if="!mirofishTarget.disabled"> →</template>
+              </button>
+            </div>
+          </template>
+
+          <!-- ===== Step 04: report -> JSON ===== -->
+          <ReportJsonPanel
+            v-else-if="step.key === 'report_json' && run"
+            :runId="runId"
+            :run="run"
+            @refresh-run="$emit('refresh-run')"
+          />
+
+          <!-- ===== Step 05: consensus ===== -->
+          <ConsensusPanel
+            v-else-if="step.key === 'consensus' && run"
+            :runId="runId"
+            :run="run"
+            @refresh-run="$emit('refresh-run')"
+          />
+
+          <!-- ===== Step 06: performance ===== -->
+          <template v-else-if="step.key === 'performance' && run">
+            <div v-if="perfSummary" class="kv-grid">
+              <div class="kv"><span class="k">PERIOD</span><span class="v">{{ perfSummary.base_date }} → {{ perfSummary.end_date }}</span></div>
+              <div class="kv"><span class="k">CONSENSUS</span><span class="v" :class="perfSummary.consensus_return >= 0 ? 'up' : 'down'">{{ fmtPct(perfSummary.consensus_return) }}</span></div>
+              <div class="kv"><span class="k">S&amp;P 500</span><span class="v">{{ fmtPct(perfSummary.spy_return) }}</span></div>
+              <div class="kv"><span class="k">EXCESS</span><span class="v" :class="perfSummary.consensus_return - perfSummary.spy_return >= 0 ? 'up' : 'down'">{{ fmtPct(perfSummary.consensus_return - perfSummary.spy_return) }}</span></div>
+            </div>
+            <div class="next-box" :class="{ done: !!perfSummary }">
+              <span v-if="perfSummary">Metrics, charts, per-persona leaderboard and correlation are in the report.</span>
+              <span v-else-if="statusOf('consensus') === 'completed'">Measure the consensus and every persona's picks from as_of until today.</span>
+              <span v-else>Waits for the consensus (step 05).</span>
+              <router-link v-if="statusOf('consensus') === 'completed'" class="action-btn" :to="`/pipeline/${runId}/performance`">Open Performance Report →</router-link>
             </div>
           </template>
 
@@ -163,9 +197,12 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import PipelineStepRail from './PipelineStepRail.vue'
+import ReportJsonPanel from './ReportJsonPanel.vue'
+import ConsensusPanel from './ConsensusPanel.vue'
 import { PIPELINE_STEPS, uiStepStatus, uiCurrentStep, uiStepError } from './pipelineSteps'
 import { useRouter } from 'vue-router'
 import { getPrompt } from '../../api/pipeline'
+import { generateReport } from '../../api/report'
 import { rememberPipelineRun } from '../../store/pipelineReturn'
 import { formatMarketCap } from '../../utils/universeGraph'
 
@@ -175,10 +212,14 @@ const props = defineProps({
   logs: { type: Array, default: () => [] }
 })
 
+defineEmits(['refresh-run'])
+
 const logContent = ref(null)
 
 const universe = computed(() => props.run?.universe || null)
 const summary = computed(() => props.run?.steps?.universe?.summary || {})
+const perfSummary = computed(() => props.run?.steps?.performance?.status === 'completed' ? props.run.steps.performance.summary : null)
+const fmtPct = (v) => v == null ? '—' : `${v > 0 ? '+' : ''}${(v * 100).toFixed(1)}%`
 const newsSummary = computed(() => {
   const s = props.run?.steps?.news
   return s?.status === 'completed' ? s.summary : null
@@ -210,13 +251,29 @@ const mirofishStages = computed(() => {
       detail: mf.value.report_id ? `${mf.value.report_id} · ${mf.value.report_status}` : 'MiroFish report agent' }
   ]
 })
-// furthest page of the original MiroFish flow for this project
+// Where the MiroFish button goes. NEVER link to /simulation/<id>/start (or
+// /simulation/<id>) once a simulation has started: those original pages
+// re-run things on mount — Step3Simulation force-restarts the simulation
+// (wiping its results; without ?maxRounds it runs the config's full length,
+// e.g. 168 rounds) and Step2EnvSetup re-runs prepare when status != ready.
 const mirofishTarget = computed(() => {
   const s = mf.value.stages || {}
-  if (mf.value.report_id) return { label: 'Open MiroFish report', path: `/report/${mf.value.report_id}` }
+  const runner = mf.value.runner_status
+  const simDone = ['completed', 'stopped'].includes(runner) || s.simulation === 'completed'
+  const simRunning = ['running', 'starting', 'stopping', 'paused'].includes(runner) && !simDone
+  if (mf.value.report_id && mf.value.report_status !== 'failed') {
+    return { label: 'Open MiroFish report', path: `/report/${mf.value.report_id}` }
+  }
+  if (simDone) {
+    // no report yet, or the last one failed: start one via the API (same call as
+    // the original "Generate Report" button) without opening the restart page
+    return { label: mf.value.report_status === 'failed' ? 'Retry MiroFish report' : 'Generate MiroFish report', action: 'report' }
+  }
+  if (simRunning) {
+    return { label: `Simulation running · round ${mf.value.current_round || 0}/${mf.value.total_rounds || '?'}`, disabled: true }
+  }
   if (mf.value.simulation_id) {
-    const started = ['running', 'completed', 'stopped', 'paused'].includes(mf.value.runner_status) || s.simulation === 'completed'
-    return { label: 'Open MiroFish simulation', path: started ? `/simulation/${mf.value.simulation_id}/start` : `/simulation/${mf.value.simulation_id}` }
+    return { label: 'Open MiroFish environment setup', path: `/simulation/${mf.value.simulation_id}` }
   }
   const pid = props.run?.links?.project_id
   return { label: s.ontology === 'completed' ? 'Continue in MiroFish' : 'Start MiroFish', path: `/process/${pid}` }
@@ -224,13 +281,30 @@ const mirofishTarget = computed(() => {
 const mirofishHint = computed(() => {
   const s = mf.value.stages || {}
   if (s.report === 'completed') return 'MiroFish report is ready — step 04 converts it to JSON.'
+  if (s.report === 'failed') return `The MiroFish report failed${mf.value.error ? ' (' + mf.value.error.slice(0, 120) + ')' : ''}. The simulation is kept — retry writes a new report from it.`
   if (Object.values(s).includes('failed')) return `A MiroFish stage failed${mf.value.error ? ': ' + mf.value.error : ''}. Open MiroFish to retry.`
+  if (mirofishTarget.value.disabled) return 'The simulation is running in MiroFish; this card updates by itself. Generate the report once it has finished.'
   if (!s.ontology || s.ontology === 'pending') return 'Seed and prompt are on the project. Run it in the original MiroFish UI: ontology → graph → env setup → simulation → report.'
   return 'Continue in MiroFish; progress here updates automatically.'
 })
-const openMirofish = () => {
+const reportBusy = ref(false)
+const openMirofish = async () => {
+  const target = mirofishTarget.value
+  if (target.disabled) return
   rememberPipelineRun(props.runId, props.run?.name)
-  router.push(mirofishTarget.value.path)
+  if (target.action === 'report') {
+    reportBusy.value = true
+    try {
+      const res = await generateReport({ simulation_id: mf.value.simulation_id, force_regenerate: true })
+      router.push(`/report/${res.data.report_id}`)
+    } catch (e) {
+      alert(`Could not start the report: ${e.message}`)
+    } finally {
+      reportBusy.value = false
+    }
+    return
+  }
+  router.push(target.path)
 }
 const promptSummary = computed(() => props.run?.steps?.prompt?.status === 'completed' ? props.run.steps.prompt.summary : null)
 const promptText = ref('')
@@ -389,6 +463,8 @@ a.action-btn { text-decoration: none; }
 a.action-btn:hover { background: #FF5722; }
 .next-box.done { background: #F6FBF6; border-color: #A5D6A7; color: #2E7D32; }
 .v small { font-size: 10px; color: #999; }
+.v.up { color: #006300; }
+.v.down { color: #B3261E; }
 .sub-steps { display: flex; flex-direction: column; gap: 6px; }
 .sub { display: flex; align-items: center; gap: 10px; background: #F9F9F9; border-radius: 5px; padding: 8px 10px; font-size: 12px; }
 .sub-dot { width: 8px; height: 8px; border-radius: 50%; background: #DDD; flex-shrink: 0; }

@@ -107,8 +107,8 @@ def _fake_sim(monkeypatch, sim_status="running", rounds=(3, 10), report_status=N
     report = SimpleNamespace(report_id="report_x", status=report_status, error=None) if report_status else None
     monkeypatch.setattr(step5_mirofish, "SimulationManager",
                         lambda: SimpleNamespace(list_simulations=lambda project_id=None: [sim]))
-    monkeypatch.setattr(step5_mirofish.ReportManager, "get_report_by_simulation",
-                        classmethod(lambda cls, sid: report))
+    monkeypatch.setattr(step5_mirofish.ReportManager, "list_reports",
+                        classmethod(lambda cls, simulation_id=None, limit=50: [report] if report else []))
     monkeypatch.setattr(step5_mirofish.SimulationRunner, "get_run_state",
                         classmethod(lambda cls, sid: SimpleNamespace(current_round=rounds[0], total_rounds=rounds[1],
                                                                       runner_status=sim_status)))
@@ -163,3 +163,21 @@ def test_sync_reports_failure(seeded, monkeypatch):
     m = step5_mirofish.sync(run_id)
     assert m["steps"]["simulation"]["status"] == "failed"
     assert m["status"] == "failed"
+
+
+def test_sync_prefers_completed_retry_over_failed_report(seeded, monkeypatch):
+    run_id, pid = seeded
+    _set_project(pid, ProjectStatus.GRAPH_COMPLETED, graph_id="g")
+    _fake_sim(monkeypatch, "completed", (10, 10), report_status="failed")
+    m = step5_mirofish.sync(run_id)
+    assert m["steps"]["simulation"]["status"] == "failed"
+
+    # retry: newest report completed, failed one still on disk (listed after it)
+    retry = SimpleNamespace(report_id="report_retry", status="completed", error=None)
+    failed = SimpleNamespace(report_id="report_x", status="failed", error="Error code: 500")
+    monkeypatch.setattr(step5_mirofish.ReportManager, "list_reports",
+                        classmethod(lambda cls, simulation_id=None, limit=50: [retry, failed]))
+    m = step5_mirofish.sync(run_id)
+    assert m["links"]["report_id"] == "report_retry"
+    assert m["steps"]["simulation"]["status"] == "completed"
+

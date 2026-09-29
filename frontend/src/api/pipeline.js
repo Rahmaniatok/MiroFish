@@ -96,3 +96,38 @@ export function feedSeed(runId) {
 export function getPrompt(runId) {
   return service({ url: `/api/pipeline/runs/${runId}/prompt`, method: 'get' })
 }
+
+// ---- step 6: report -> JSON ----
+
+/** Conversion status + result JSON + validation meta */
+export function getReportJson(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/report-json`, method: 'get' })
+}
+
+/** Convert the completed MiroFish report into the persona JSON (background LLM job) */
+export function startReportJson(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/report-json`, method: 'post' })
+}
+
+// ---- step 7: consensus ----
+
+export function getConsensus(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/consensus`, method: 'get' })
+}
+
+/** (Re)compute: persona votes, top n, ties at the cutoff included, min_votes floor */
+export function buildConsensus(runId, n, minVotes) {
+  return service({ url: `/api/pipeline/runs/${runId}/consensus`, method: 'post', data: { n, min_votes: minVotes } })
+}
+
+// ---- step 8: performance ----
+
+/** {result, stale, status} — result holds series, metrics, holdings, correlation */
+export function getPerformance(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/performance`, method: 'get' })
+}
+
+/** (Re)build with yfinance prices up to today */
+export function buildPerformance(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/performance`, method: 'post' })
+}

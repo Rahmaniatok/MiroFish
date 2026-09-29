@@ -32,6 +32,19 @@ def _value(v: Any) -> Any:
     return getattr(v, "value", v)
 
 
+def _pick_report(simulation_id: str):
+    """
+    Newest completed report of the simulation, else its newest report.
+    (ReportManager.get_report_by_simulation returns whichever it meets first on
+    disk — after a failed report is retried there are two, and the failed one
+    could win.)
+    """
+    reports = ReportManager.list_reports(simulation_id=simulation_id)   # newest first
+    if not reports:
+        return None
+    return next((r for r in reports if _value(r.status) == "completed"), reports[0])
+
+
 def _pick_simulation(project_id: str):
     """Latest simulation of the project that has a report, else the latest one."""
     sims = SimulationManager().list_simulations(project_id=project_id)
@@ -39,7 +52,7 @@ def _pick_simulation(project_id: str):
         return None, None
     sims.sort(key=lambda s: s.created_at, reverse=True)
     for sim in sims:
-        report = ReportManager.get_report_by_simulation(sim.simulation_id)
+        report = _pick_report(sim.simulation_id)
         if report is not None:
             return sim, report
     return sims[0], None

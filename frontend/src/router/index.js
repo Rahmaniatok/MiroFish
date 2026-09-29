@@ -8,6 +8,7 @@ import InteractionView from '../views/InteractionView.vue'
 import PipelineHome from '../views/pipeline/PipelineHome.vue'
 import PipelineWorkspace from '../views/pipeline/PipelineWorkspace.vue'
 import PipelineNews from '../views/pipeline/PipelineNews.vue'
+import PipelinePerformance from '../views/pipeline/PipelinePerformance.vue'
 
 const routes = [
   {
@@ -60,6 +61,12 @@ const routes = [
     path: '/pipeline/:runId/news',
     name: 'PipelineNews',
     component: PipelineNews,
+    props: true
+  },
+  {
+    path: '/pipeline/:runId/performance',
+    name: 'PipelinePerformance',
+    component: PipelinePerformance,
     props: true
   }
 ]

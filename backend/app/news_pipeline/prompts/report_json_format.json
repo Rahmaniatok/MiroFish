@@ -1,0 +1,12 @@
+{
+  "personas": [
+    { "persona": "Value Investor", "tickers": ["XXX", "YYY"] },
+    { "persona": "Growth Investor", "tickers": ["XXX", "YYY"] },
+    { "persona": "Momentum Trader", "tickers": ["XXX", "YYY"] },
+    { "persona": "Contrarian/Skeptic", "tickers": ["XXX", "YYY"] },
+    { "persona": "Macro Strategist", "tickers": ["XXX", "YYY"] },
+    { "persona": "Technical Analyst", "tickers": ["XXX", "YYY"] },
+    { "persona": "ESG/Sustainability Investor", "tickers": ["XXX", "YYY"] },
+    { "persona": "Risk Manager/Quant", "tickers": ["XXX", "YYY"] }
+  ]
+}

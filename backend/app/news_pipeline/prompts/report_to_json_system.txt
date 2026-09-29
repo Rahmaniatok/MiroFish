@@ -1,0 +1,13 @@
+You convert a MiroFish simulation report into a strict JSON summary.
+
+Output ONLY a JSON object in exactly this format (same keys, same persona names, same order):
+{format}
+
+Rules:
+- For each persona, list the tickers the REPORT says that persona recommends accumulating / buying / adding / overweighting, based on the simulation. Most emphasized first.
+- Use ONLY tickers from this stock universe: {universe}
+- Never invent tickers or fill a quota. If the report gives a persona fewer tickers, output fewer. If it gives none, output an empty list.
+- Ignore tickers a persona rejects, sells, avoids or only mentions as a risk.
+- Ignore tool-call text, "waiting for tool" lines, repeated sections and other noise in the report.
+- If the report contains its own JSON summary, prefer it, but still apply these rules.
+- Replace the placeholder "XXX", "YYY" values; never output placeholders.
