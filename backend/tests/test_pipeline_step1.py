@@ -13,9 +13,12 @@ from app.news_pipeline import run_store, step1_universe
 
 
 _SCREEN_ROWS = [
-    {"ticker": "XOM", "company_name": "Exxon", "gics_sector": "Energy", "market_cap": 450e9, "market_cap_tier": "mega"},
-    {"ticker": "COP", "company_name": "Conoco", "gics_sector": "Energy", "market_cap": 120e9, "market_cap_tier": "large"},
-    {"ticker": "APA", "company_name": "APA", "gics_sector": "Energy", "market_cap": 8e9, "market_cap_tier": "mid"},
+    {"ticker": "XOM", "company_name": "Exxon", "gics_sector": "Energy", "gics_sub_industry": "Integrated Oil & Gas",
+     "market_cap": 450e9, "market_cap_tier": "mega"},
+    {"ticker": "COP", "company_name": "Conoco", "gics_sector": "Energy", "gics_sub_industry": "Oil & Gas Exploration & Production",
+     "market_cap": 120e9, "market_cap_tier": "large"},
+    {"ticker": "APA", "company_name": "APA", "gics_sector": "Energy", "gics_sub_industry": "Oil & Gas Exploration & Production",
+     "market_cap": 8e9, "market_cap_tier": "mid"},
 ]
 
 
@@ -122,3 +125,26 @@ def test_run_survives_reload_and_rejects_path_ids(client):
     assert reloaded["current_step"] == 2
     assert reloaded["steps"]["news"]["error"] == "boom"
     assert client.get('/api/pipeline/runs/..%2Fetc').status_code == 404
+
+
+def test_lock_filters_by_industry(client):
+    task_id, _ = _screen(client, ["mega", "large", "mid", "small"])
+    r = client.post('/api/pipeline/runs', json={"task_id": task_id, "market_cap_tiers": ["mega", "large", "mid"],
+                                                 "industries": ["Oil & Gas Exploration & Production"]})
+    assert r.status_code == 201
+    run = r.json["data"]
+    u = client.get(f'/api/pipeline/runs/{run["run_id"]}').json["data"]["universe"]
+    assert u["ticker_universe"] == ["COP", "APA"]
+    assert [x["ticker"] for x in u["industry_filtered_out"]] == ["XOM"]
+    assert run["config"]["industries"] == ["Oil & Gas Exploration & Production"]
+    assert run["steps"]["universe"]["summary"]["by_industry"] == {"Oil & Gas Exploration & Production": 2}
+
+
+def test_lock_all_industries_by_default_and_rejects_unknown(client):
+    task_id, _ = _screen(client, ["mega", "large", "mid", "small"])
+    run = client.post('/api/pipeline/runs', json={"task_id": task_id}).json["data"]
+    assert run["config"]["industries"] is None
+    assert "all industries" in run_store.read_log(run["run_id"])[-2]["message"]
+    r = client.post('/api/pipeline/runs', json={"task_id": task_id, "industries": ["Semiconductors"]})
+    assert r.status_code == 400 and "Semiconductors" in r.json["error"]
+

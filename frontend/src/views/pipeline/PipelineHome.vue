@@ -53,10 +53,55 @@
           </div>
         </div>
 
+        <!-- Industry (GICS sub-industry) -->
+        <div class="config-block industry-block">
+          <div class="block-head">
+            <span class="block-num">B</span>
+            <span class="block-title">Industry</span>
+            <span class="block-hint" v-if="availableIndustries.length">
+              {{ industryAll ? 'all' : chosenCount }} / {{ availableIndustries.length }}
+            </span>
+            <div class="block-actions" v-if="availableIndustries.length">
+              <button class="link-btn" @click="selectAllIndustries">All</button>
+              <button class="link-btn" @click="clearIndustries">None</button>
+            </div>
+          </div>
+          <div v-if="!availableIndustries.length" class="ind-empty">Pick a sector first — its GICS sub-industries appear here.</div>
+          <template v-else>
+            <div class="ind-search">
+              <span class="ind-search-icon">⌕</span>
+              <input v-model="industrySearch" placeholder="Search industry…" />
+              <button v-if="industrySearch" class="ind-clear" @click="industrySearch = ''">×</button>
+            </div>
+            <label class="ind-all" :class="{ on: industryAll }">
+              <input type="checkbox" :checked="industryAll" @change="industryAll ? clearIndustries() : selectAllIndustries()" />
+              <span class="ind-name">All industries</span>
+              <span class="ind-count">{{ previewAllCount }}</span>
+            </label>
+            <div class="ind-list">
+              <template v-for="g in industryGroups" :key="g.sector">
+                <!-- per-sector "all": every industry of this sector (ignores the search) -->
+                <label class="ind-group" :class="sectorState(g.sector)">
+                  <input type="checkbox" :checked="sectorState(g.sector) === 'all'"
+                         :indeterminate.prop="sectorState(g.sector) === 'some'" @change="toggleSectorIndustries(g.sector)" />
+                  <span class="ind-group-name">All · {{ g.sector }}</span>
+                  <span class="ind-count">{{ sectorIndustryCount(g.sector) }}</span>
+                </label>
+                <label v-for="ind in g.items" :key="ind.name" class="ind-row" :class="{ on: isIndustryOn(ind.name) }">
+                  <input type="checkbox" :checked="isIndustryOn(ind.name)" @change="toggleIndustry(ind.name)" />
+                  <span class="ind-name" v-html="highlight(ind.name)"></span>
+                  <span class="ind-count">{{ ind.count }}</span>
+                </label>
+              </template>
+              <div v-if="!industryGroups.length" class="ind-empty">No industry matches “{{ industrySearch }}”.</div>
+            </div>
+          </template>
+        </div>
+
         <!-- Tiers -->
         <div class="config-block">
           <div class="block-head">
-            <span class="block-num">B</span>
+            <span class="block-num">C</span>
             <span class="block-title">Market Cap Tier</span>
             <span class="block-hint" v-if="screenReady">instant — no re-screen</span>
           </div>
@@ -76,10 +121,42 @@
           </div>
         </div>
 
+        <!-- Sharia -->
+        <div class="config-block sharia-block" :class="{ on: shariaOn }">
+          <div class="block-head">
+            <span class="block-num">D</span>
+            <span class="block-title">Sharia Filter</span>
+            <span class="block-std" v-if="shariaStds.length === 2">BOTH · INTERSECTION</span>
+            <span class="block-std" v-else-if="shariaOn">{{ stdLabel(shariaStds[0]) }} ONLY</span>
+          </div>
+          <div class="std-list">
+            <div v-for="key in STD_KEYS" :key="key" class="std-row" :class="{ on: shariaStds.includes(key) }">
+              <div class="std-head">
+                <span class="std-name">{{ options.sharia?.standards?.[key]?.label || key }}</span>
+                <span class="std-sub">{{ options.sharia?.standards?.[key]?.standard }}</span>
+                <button class="switch" :class="{ on: shariaStds.includes(key) }" role="switch"
+                        :aria-checked="shariaStds.includes(key)" @click="toggleStd(key)">
+                  <span class="knob"></span>
+                </button>
+              </div>
+              <ul class="sharia-rules">
+                <li v-for="r in (options.sharia?.standards?.[key]?.rules || [])" :key="r">{{ r }}</li>
+              </ul>
+            </div>
+          </div>
+          <p class="std-note">{{ options.sharia?.missing_rule }}. Turn both on to keep only tickers that pass <b>both</b> standards.</p>
+          <div v-if="shariaOn && (screenReady || screen.status === 'running')" class="sharia-counts">
+            <span class="sc ok">✓ {{ shariaCounts.compliant }} pass</span>
+            <span class="sc bad">✗ {{ shariaCounts.non_compliant }} fail</span>
+            <span class="sc unk">? {{ shariaCounts.unknown }} no data</span>
+            <span class="sc-note">in selected tiers</span>
+          </div>
+        </div>
+
         <!-- As-of -->
         <div class="config-block">
           <div class="block-head">
-            <span class="block-num">C</span>
+            <span class="block-num">E</span>
             <span class="block-title">As-of Date</span>
           </div>
           <div class="asof-row">
@@ -180,7 +257,7 @@
             <span></span>
             <span>Ticker</span>
             <span>Company</span>
-            <span>Sector</span>
+            <span>{{ shariaOn ? 'Sharia' : 'Industry' }}</span>
             <span class="r">Market cap</span>
             <span>Tier</span>
           </div>
@@ -198,7 +275,14 @@
               </span>
               <span class="cell-ticker">{{ row.ticker }}</span>
               <span class="cell-company">{{ row.company_name }}</span>
-              <span class="cell-sector">{{ row.gics_sector }}</span>
+              <!-- with the Sharia filter on, the sector column shows the per-standard verdicts -->
+              <span v-if="shariaOn && row.sharia" class="cell-sharia">
+                <span v-for="key in shariaStds" :key="key" class="sh-chip" :class="row.sharia[key]?.verdict || 'unknown'"
+                      :title="`${stdLabel(key)}: ` + ((row.sharia[key]?.reasons || []).join(' · ') || 'passes all computed screens')">
+                  {{ stdShort(key) }} {{ verdictIcon(row.sharia[key]?.verdict) }}<template v-if="row.sharia[key]?.verdict === 'non_compliant'"> {{ shortReason(row.sharia[key]) }}</template>
+                </span>
+              </span>
+              <span v-else class="cell-sector" :title="row.gics_sector">{{ row.gics_sub_industry || row.gics_sector }}</span>
               <span class="cell-cap r">
                 <template v-if="row.market_cap != null">
                   <span class="cap-bar"><span :style="{ width: capWidth(row.market_cap) + '%' }"></span></span>
@@ -288,6 +372,25 @@ const options = ref({ sectors: [], market_cap_tiers: [], as_of: null, caveats: [
 const allConstituents = ref([])
 const selectedSectors = ref([])
 const selectedTiers = ref(['mega', 'large'])
+// Shari'ah standards to apply; both selected = intersection (must pass both)
+const STD_KEYS = ['aaoifi', 'djim']
+const shariaStds = ref([])
+const shariaOn = computed(() => shariaStds.value.length > 0)
+const toggleStd = (key) => {
+  shariaStds.value = shariaStds.value.includes(key)
+    ? shariaStds.value.filter(k => k !== key)
+    : STD_KEYS.filter(k => k === key || shariaStds.value.includes(k))
+}
+const stdLabel = (key) => ({ aaoifi: 'AAOIFI', djim: 'DJIM' }[key] || key)
+const stdShort = (key) => ({ aaoifi: 'AAOIFI', djim: 'DJIM' }[key] || key)
+const verdictIcon = (v) => ({ compliant: '✓', non_compliant: '✗' }[v] || '?')
+// same rule as backend universe.sharia_combined
+const combinedVerdict = (sharia) => {
+  const vs = shariaStds.value.map(k => sharia?.[k]?.verdict || 'unknown')
+  if (vs.includes('non_compliant')) return 'non_compliant'
+  if (vs.includes('unknown')) return 'unknown'
+  return 'compliant'
+}
 const asOf = ref('')
 const asOfWarnings = ref([])
 const asOfError = ref('')
@@ -339,10 +442,80 @@ const screenStale = computed(() =>
   screen.status === 'done' && (screen.sectorsKey !== sectorsKey.value || screen.asOf !== asOf.value))
 const screenReady = computed(() => screen.status === 'done' && !screenStale.value)
 
-const previewRows = computed(() => {
+// ---- industry (GICS sub-industry) filter: "all" by default, instant like tiers ----
+const industryAll = ref(true)
+const chosenIndustries = ref(new Set())
+const industrySearch = ref('')
+const sectorRows = computed(() => {
   const set = new Set(selectedSectors.value)
   return allConstituents.value.filter(r => set.has(r.gics_sector))
 })
+const availableIndustries = computed(() => {
+  const m = new Map()
+  sectorRows.value.forEach(r => {
+    const name = r.gics_sub_industry || 'Unclassified'
+    if (!m.has(name)) m.set(name, { name, sector: r.gics_sector, count: 0 })
+    m.get(name).count++
+  })
+  return [...m.values()].sort((a, b) => a.sector.localeCompare(b.sector) || a.name.localeCompare(b.name))
+})
+const industryGroups = computed(() => {
+  const q = industrySearch.value.trim().toLowerCase()
+  const groups = []
+  availableIndustries.value.filter(i => !q || i.name.toLowerCase().includes(q)).forEach(i => {
+    let g = groups.find(x => x.sector === i.sector)
+    if (!g) groups.push(g = { sector: i.sector, items: [] })
+    g.items.push(i)
+  })
+  return groups
+})
+const isIndustryOn = (name) => industryAll.value || chosenIndustries.value.has(name)
+const chosenCount = computed(() => availableIndustries.value.filter(i => chosenIndustries.value.has(i.name)).length)
+const selectAllIndustries = () => { industryAll.value = true; chosenIndustries.value = new Set() }
+const clearIndustries = () => { industryAll.value = false; chosenIndustries.value = new Set() }
+const toggleIndustry = (name) => {
+  // leaving "all": start from every available industry, then untick this one
+  const next = industryAll.value ? new Set(availableIndustries.value.map(i => i.name)) : new Set(chosenIndustries.value)
+  next.has(name) ? next.delete(name) : next.add(name)
+  industryAll.value = false
+  chosenIndustries.value = next
+  if (availableIndustries.value.every(i => next.has(i.name))) selectAllIndustries()
+}
+// per-sector "all": state of the sector's industries and a toggle for all of them
+const sectorIndustries = (sector) => availableIndustries.value.filter(i => i.sector === sector)
+const sectorIndustryCount = (sector) => sectorIndustries(sector).reduce((n, i) => n + i.count, 0)
+const sectorState = (sector) => {
+  const names = sectorIndustries(sector).map(i => i.name)
+  const on = names.filter(isIndustryOn).length
+  return on === names.length ? 'all' : on === 0 ? 'none' : 'some'
+}
+const toggleSectorIndustries = (sector) => {
+  const names = sectorIndustries(sector).map(i => i.name)
+  const next = industryAll.value ? new Set(availableIndustries.value.map(i => i.name)) : new Set(chosenIndustries.value)
+  const allOn = names.every(n => next.has(n))
+  names.forEach(n => (allOn ? next.delete(n) : next.add(n)))
+  industryAll.value = false
+  chosenIndustries.value = next
+  if (availableIndustries.value.every(i => next.has(i.name))) selectAllIndustries()
+}
+const escapeHtml = (t) => t.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+const highlight = (name) => {
+  const q = industrySearch.value.trim()
+  if (!q) return escapeHtml(name)
+  const i = name.toLowerCase().indexOf(q.toLowerCase())
+  if (i < 0) return escapeHtml(name)
+  return escapeHtml(name.slice(0, i)) + '<mark>' + escapeHtml(name.slice(i, i + q.length)) + '</mark>' + escapeHtml(name.slice(i + q.length))
+}
+const previewAllCount = computed(() => sectorRows.value.length)
+// sectors removed -> drop their industries from a custom selection
+watch(availableIndustries, (list) => {
+  if (industryAll.value) return
+  const names = new Set(list.map(i => i.name))
+  chosenIndustries.value = new Set([...chosenIndustries.value].filter(n => names.has(n)))
+})
+
+const previewRows = computed(() => sectorRows.value.filter(r =>
+  industryAll.value || chosenIndustries.value.has(r.gics_sub_industry || 'Unclassified')))
 
 // Merge the instant constituent preview with streamed screen results
 const rows = computed(() => {
@@ -354,14 +527,33 @@ const rows = computed(() => {
     if (d?.outcome === 'skipped') state = 'skipped'
     else if (d) {
       if (!selectedTiers.value.includes(d.tier)) state = 'out'
+      else if (shariaOn.value && combinedVerdict(d.sharia) !== 'compliant') state = 'haram'
       else state = excluded.value.has(r.ticker) ? 'excluded' : 'in'
     }
     if (screen.status === 'running' && screen.current === r.ticker && !d) state = 'scanning'
-    return { ...r, state, tier: d?.tier || null, market_cap: d?.market_cap ?? null, reason: d?.reason }
+    return { ...r, state, tier: d?.tier || null, market_cap: d?.market_cap ?? null, reason: d?.reason, sharia: d?.sharia || null }
   }).sort((a, b) => (b.market_cap ?? -1) - (a.market_cap ?? -1) || a.ticker.localeCompare(b.ticker))
 })
 
 const universeRows = computed(() => rows.value.filter(r => r.state === 'in'))
+// AAOIFI verdicts among in-tier screened tickers (what the toggle keeps / drops)
+const shariaCounts = computed(() => {
+  const c = { compliant: 0, non_compliant: 0, unknown: 0 }
+  rows.value.forEach(r => {
+    if (r.sharia && ['in', 'excluded', 'haram'].includes(r.state)) {
+      const v = combinedVerdict(r.sharia)
+      c[v] = (c[v] || 0) + 1
+    }
+  })
+  return c
+})
+const shortReason = (sh) => {
+  if (sh?.category) return sh.category.replace('_', ' ')
+  const first = sh?.reasons?.[0] || 'not compliant'
+  return first.replace('/24m avg market cap', '').replace('debt/market cap', 'debt').replace('cash/market cap', 'cash')
+    .replace(' (approx.)', '').replace(/ ≥ \d+%/, '')
+}
+watch(shariaOn, (on) => { if (!on && tab.value === 'sharia') tab.value = 'universe' })
 const totalCap = computed(() => (screenReady.value || screen.status === 'running')
   ? universeRows.value.reduce((s, r) => s + r.market_cap, 0) : null)
 const countByTier = (list) => list.reduce((c, r) => { c[r.tier] = (c[r.tier] || 0) + 1; return c }, {})
@@ -379,6 +571,7 @@ const capWidth = (cap) => Math.max(2, Math.sqrt(cap / maxCap.value) * 100)
 const TAB_STATES = {
   universe: ['in', 'excluded', 'preview', 'queued', 'scanning'],
   out: ['out'],
+  sharia: ['haram'],
   skipped: ['skipped']
 }
 const tabs = computed(() => {
@@ -386,6 +579,7 @@ const tabs = computed(() => {
   return [
     { key: 'universe', label: 'Universe', count: count(['in']) },
     { key: 'out', label: 'Out of tier', count: count(TAB_STATES.out) },
+    ...(shariaOn.value ? [{ key: 'sharia', label: 'Not Sharia-compliant', count: count(TAB_STATES.sharia) }] : []),
     { key: 'skipped', label: 'No data', count: count(TAB_STATES.skipped) },
     { key: 'all', label: 'All', count: rows.value.length }
   ]
@@ -402,7 +596,7 @@ const visibleRows = computed(() => {
 const screenPct = computed(() => screen.inScope ? Math.round(screen.processed * 100 / screen.inScope) : 3)
 
 const canScreen = computed(() =>
-  selectedSectors.value.length > 0 && asOf.value && !asOfError.value && screen.status !== 'running')
+  selectedSectors.value.length > 0 && previewRows.value.length > 0 && asOf.value && !asOfError.value && screen.status !== 'running')
 const canLock = computed(() =>
   screenReady.value && universeRows.value.length > 0 && selectedTiers.value.length > 0)
 
@@ -456,7 +650,7 @@ const absorb = (rowsIn, outcome) => {
   (rowsIn || []).forEach(r => {
     screen.data[r.ticker] = outcome === 'skipped'
       ? { outcome, reason: r.reason }
-      : { outcome, tier: r.market_cap_tier, market_cap: r.market_cap }
+      : { outcome, tier: r.market_cap_tier, market_cap: r.market_cap, sharia: r.sharia }
   })
 }
 
@@ -523,6 +717,8 @@ const lockUniverse = async () => {
       task_id: screen.taskId,
       name: runName.value.trim() || defaultRunName.value,
       market_cap_tiers: selectedTiers.value,
+      sharia_standards: shariaStds.value,
+      industries: industryAll.value ? null : availableIndustries.value.filter(i => chosenIndustries.value.has(i.name)).map(i => i.name),
       excluded_tickers: [...excluded.value]
     })
     router.push(`/pipeline/${res.data.run_id}/news`)
@@ -778,6 +974,68 @@ code {
   color: #AAA;
 }
 .sector-tile.on .sector-count { color: #FF5722; }
+
+.ind-empty { font-size: 11.5px; color: #999; padding: 4px 2px; }
+.ind-search { position: relative; margin-bottom: 8px; }
+.ind-search input {
+  width: 100%; box-sizing: border-box; border: 1px solid #E5E5E5; border-radius: 6px; padding: 8px 28px 8px 28px;
+  font-size: 12px; outline: none; font-family: inherit;
+}
+.ind-search input:focus { border-color: #000; }
+.ind-search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: #AAA; font-size: 14px; }
+.ind-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); border: none; background: none; color: #999; font-size: 16px; cursor: pointer; }
+.ind-all, .ind-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 5px; cursor: pointer; font-size: 12px; }
+.ind-all { border: 1px solid #EEE; margin-bottom: 6px; font-weight: 700; }
+.ind-all.on { border-color: #000; background: #FAFAFA; }
+.ind-row:hover { background: #F7F7F7; }
+.ind-row:not(.on) { color: #999; }
+.ind-all input, .ind-row input { accent-color: #FF5722; margin: 0; }
+.ind-name { flex: 1; min-width: 0; }
+.ind-name :deep(mark), .ind-name mark { background: #FFE0D4; color: inherit; border-radius: 2px; }
+.ind-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #AAA; }
+.ind-row.on .ind-count { color: #FF5722; }
+.ind-list { max-height: 230px; overflow-y: auto; padding-right: 2px; }
+.ind-group {
+  display: flex; align-items: center; gap: 8px; margin-top: 6px; padding: 6px 8px; border-radius: 5px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 800; color: #999; letter-spacing: 0.5px;
+  text-transform: uppercase; background: #FAFAFA; position: sticky; top: 0; z-index: 1;
+}
+.ind-group:first-child { margin-top: 0; }
+.ind-group:hover { background: #F2F2F2; }
+.ind-group.all, .ind-group.some { color: #000; }
+.ind-group input { accent-color: #FF5722; margin: 0; }
+.ind-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ind-group.all .ind-count, .ind-group.some .ind-count { color: #FF5722; }
+
+.sharia-block.on { border-color: #1b7a4a; box-shadow: 0 0 0 1px #1b7a4a inset; }
+.block-std { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; color: #1b7a4a; background: #E8F5EE; padding: 2px 6px; border-radius: 3px; }
+.switch { margin-left: auto; width: 38px; height: 22px; border-radius: 11px; border: none; background: #DDD; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+.switch .knob { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #FFF; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: left 0.2s; }
+.switch.on { background: #1b7a4a; }
+.switch.on .knob { left: 19px; }
+.std-list { display: flex; flex-direction: column; gap: 8px; }
+.std-row { border: 1px solid #EEE; border-radius: 6px; padding: 8px 10px; transition: all 0.2s; }
+.std-row.on { border-color: #1b7a4a; background: #F6FBF8; }
+.std-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.std-name { font-weight: 700; font-size: 12px; }
+.std-sub { font-size: 9.5px; color: #999; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.std-note { font-size: 10.5px; color: #888; margin-top: 8px; line-height: 1.45; }
+.sharia-rules { list-style: none; display: flex; flex-direction: column; gap: 3px; font-size: 10.5px; color: #777; line-height: 1.45; }
+.sharia-rules li::before { content: '· '; color: #1b7a4a; font-weight: 800; }
+.std-row:not(.on) .sharia-rules { opacity: 0.55; }
+.sharia-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+.sc { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 700; padding: 3px 7px; border-radius: 4px; }
+.sc.ok { background: #E8F5EE; color: #1b7a4a; }
+.sc.bad { background: #FDECEC; color: #B3261E; }
+.sc.unk { background: #F2F2F2; color: #777; }
+.sc-note { font-size: 10px; color: #AAA; }
+.cell-sharia { display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; }
+.cell-sharia .sh-chip { margin-left: 0; }
+.sh-chip { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 3px; margin-left: 6px; cursor: help; white-space: nowrap; }
+.sh-chip.compliant { background: #E8F5EE; color: #1b7a4a; }
+.sh-chip.non_compliant { background: #FDECEC; color: #B3261E; }
+.sh-chip.unknown { background: #F2F2F2; color: #777; }
+.t-row.haram { opacity: 0.55; }
 
 .tier-grid {
   display: grid;

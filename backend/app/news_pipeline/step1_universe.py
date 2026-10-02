@@ -15,8 +15,10 @@ from typing import Any, Dict, List, Optional
 
 from ..data_layer.universe import (
     MARKET_CAP_TIERS,
+    SHARIA_STANDARDS,
     _run_screen,
     get_sp500_constituents,
+    sharia_combined,
 )
 from ..models.task import TaskManager, TaskStatus
 from ..utils.logger import get_logger
@@ -49,6 +51,45 @@ NEWS_WINDOW_DAYS = 90
 FINNHUB_LIMIT_DAYS = 360
 FULL_NEWS_COVERAGE_DAYS = FINNHUB_LIMIT_DAYS - NEWS_WINDOW_DAYS
 
+# Shari'ah standards the step-1 filter can apply; several = INTERSECTION.
+SHARIA_STANDARD_INFO = {
+    "aaoifi": {
+        "label": "AAOIFI",
+        "standard": "AAOIFI Shari'ah Standard No. 21",
+        "rules": [
+            "Business activity: no conventional finance, alcohol, tobacco, gambling or weapons as primary business",
+            "Interest-bearing debt / market cap < 30%",
+            "(Cash + interest-bearing securities) / market cap < 30% — approximated with yfinance totalCash",
+        ],
+        "caveat": ("AAOIFI screen is PARTIAL and uses the current yfinance snapshot: the 5% impure-income "
+                   "test, subsidiary look-through and Islamic-bank carve-outs are not computed."),
+    },
+    "djim": {
+        "label": "Dow Jones Islamic",
+        "standard": "Dow Jones Islamic Market Indices methodology",
+        "rules": [
+            "Business activity: no alcohol, pork, conventional finance, entertainment (hotels, casinos, "
+            "cinema, music), tobacco or weapons",
+            "Total debt / 24-month average market cap < 33%",
+            "(Cash + interest-bearing securities) / 24-month average market cap < 33% — approximated",
+            "Accounts receivable / 24-month average market cap < 33%",
+        ],
+        "caveat": ("DJIM screen uses the last quarterly balance sheet on or before as_of and current share "
+                   "count × 24 monthly closes; newspapers filed by Yahoo under 'Entertainment' are excluded "
+                   "and income purification is not computed."),
+    },
+}
+SHARIA_MISSING_RULE = "Tickers whose ratios are unavailable are excluded (compliance cannot be shown)"
+
+
+def normalize_sharia_standards(standards: Optional[List[str]] = None, legacy_flag: bool = False) -> List[str]:
+    chosen = list(standards or (["aaoifi"] if legacy_flag else []))
+    unknown = set(chosen) - set(SHARIA_STANDARDS)
+    if unknown:
+        raise ValueError(f"Unknown Sharia standard(s): {sorted(unknown)}")
+    return [s for s in SHARIA_STANDARDS if s in chosen]
+
+
 CAVEATS = [
     "Market cap / tier uses the CURRENT yfinance snapshot, not the value on as_of "
     "(yfinance has no historical fundamentals).",
@@ -69,6 +110,8 @@ def get_options() -> Dict[str, Any]:
             "news_window_days": NEWS_WINDOW_DAYS,
         },
         "caveats": CAVEATS,
+        "sharia": {"standards": SHARIA_STANDARD_INFO, "missing_rule": SHARIA_MISSING_RULE,
+                   "combine": "several standards = intersection (must pass every selected one)"},
     }
 
 
@@ -187,6 +230,9 @@ def lock_universe(
     name: str,
     excluded_tickers: Optional[List[str]] = None,
     market_cap_tiers: Optional[List[str]] = None,
+    sharia_filter: bool = False,
+    sharia_standards: Optional[List[str]] = None,
+    industries: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Create a pipeline run from a finished screen. The universe rows come from
@@ -196,6 +242,15 @@ def lock_universe(
     screen: every sector-matched ticker already has its tier computed (it's in
     either "universe" or "filtered_out"), so the UI can screen once with all
     tiers and toggle tiers instantly. Must be a subset of the screened tiers.
+
+    industries: GICS sub-industries to keep; None/empty = all industries of the
+    chosen sectors (the default). Like tiers, applied on the finished screen.
+
+    sharia_standards: Shari'ah standards to apply ("aaoifi", "djim"); several =
+    INTERSECTION. (sharia_filter=True alone is the older AAOIFI-only form.)
+    Keep only tickers "compliant" under every chosen standard
+    (computed during the screen, see universe.sharia_summary); non-compliant
+    AND unknown ones are recorded in `sharia_excluded` with their reasons.
     """
     task = TaskManager().get_task(task_id)
     if task is None or task.task_type != TASK_TYPE:
@@ -215,6 +270,30 @@ def lock_universe(
     in_tier = [r for r in candidates if r["market_cap_tier"] in tiers]
     filtered_out = [r for r in candidates if r["market_cap_tier"] not in tiers]
 
+    industry_out: List[Dict[str, Any]] = []
+    chosen_industries = sorted(set(industries)) if industries else None
+    if chosen_industries:
+        known = {r.get("gics_sub_industry") for r in candidates}
+        unknown = sorted(set(chosen_industries) - known)
+        if unknown:
+            raise ValueError(f"Industry not in the screened sectors: {', '.join(unknown)}")
+        industry_out = [r for r in in_tier if r.get("gics_sub_industry") not in chosen_industries]
+        in_tier = [r for r in in_tier if r.get("gics_sub_industry") in chosen_industries]
+
+    standards = normalize_sharia_standards(sharia_standards, sharia_filter)
+    sharia_excluded: List[Dict[str, Any]] = []
+    if standards:
+        kept = []
+        for r in in_tier:
+            c = sharia_combined(r.get("sharia"), standards)
+            if c["verdict"] == "compliant":
+                kept.append(r)
+            else:
+                sharia_excluded.append({"ticker": r["ticker"], "company_name": r["company_name"],
+                                        "verdict": c["verdict"], "by_standard": c["by_standard"],
+                                        "reasons": c["reasons"] or ["no Sharia data"]})
+        in_tier = kept
+
     excluded = {t.upper() for t in (excluded_tickers or [])}
     universe = [r for r in in_tier if r["ticker"] not in excluded]
     if not universe:
@@ -225,6 +304,9 @@ def lock_universe(
         "as_of_date": screen["as_of_date"],
         "sectors": screen["sectors"],
         "market_cap_tiers": [t for t in MARKET_CAP_TIERS if t in tiers],
+        "industries": chosen_industries,          # None = all industries
+        "sharia_filter": bool(standards),
+        "sharia_standards": standards,
     }
     manifest = run_store.create_run(name, config)
     run_id = manifest["run_id"]
@@ -236,17 +318,27 @@ def lock_universe(
         "universe": universe,
         "excluded_by_user": sorted(excluded & {r["ticker"] for r in in_tier}),
         "filtered_out": filtered_out,
+        "industry_filtered_out": industry_out,
         "skipped": screen["skipped"],
         "sp500_total": screen["sp500_total"],
         "screened_at": screen["screened_at"],
         "warnings": warnings,
-        "caveats": CAVEATS,
+        "caveats": CAVEATS + [SHARIA_STANDARD_INFO[s]["caveat"] for s in standards],
+        "sharia": ({"standards": standards,
+                    "standard": " ∩ ".join(SHARIA_STANDARD_INFO[s]["standard"] for s in standards),
+                    "rules": {s: SHARIA_STANDARD_INFO[s]["rules"] for s in standards},
+                    "combine": "intersection" if len(standards) > 1 else "single",
+                    "excluded": sharia_excluded}
+                   if standards else None),
     }
     run_store.write_artifact(run_id, ARTIFACT, artifact)
 
     by_sector: Dict[str, int] = {}
     by_tier: Dict[str, int] = {}
+    by_industry: Dict[str, int] = {}
     for r in universe:
+        ind = r.get("gics_sub_industry") or "Unknown"
+        by_industry[ind] = by_industry.get(ind, 0) + 1
         by_sector[r["gics_sector"]] = by_sector.get(r["gics_sector"], 0) + 1
         by_tier[r["market_cap_tier"]] = by_tier.get(r["market_cap_tier"], 0) + 1
     summary = {
@@ -254,11 +346,20 @@ def lock_universe(
         "total_market_cap": sum(r["market_cap"] for r in universe),
         "by_sector": by_sector,
         "by_tier": by_tier,
+        "by_industry": by_industry,
+        "industries": chosen_industries,
         "skipped_count": len(screen["skipped"]),
         "excluded_by_user": artifact["excluded_by_user"],
+        "sharia_filter": bool(standards),
+        "sharia_standards": standards,
+        "sharia_excluded_count": len(sharia_excluded),
     }
     run_store.append_log(run_id, "universe_locked",
-                         f"ticker_universe locked: {len(universe)} tickers @ {config['as_of_date']}",
+                         f"ticker_universe locked: {len(universe)} tickers @ {config['as_of_date']}"
+                         + (f" · {len(chosen_industries)} industr{'y' if len(chosen_industries) == 1 else 'ies'}"
+                            if chosen_industries else " · all industries")
+                         + (f" · Sharia filter ({' ∩ '.join(SHARIA_STANDARD_INFO[s]['label'] for s in standards)})"
+                            f" removed {len(sharia_excluded)}" if standards else ""),
                          {"tickers": artifact["ticker_universe"], "warnings": warnings})
     return run_store.update_step(run_id, "universe", run_store.STEP_COMPLETED,
                                  artifact=ARTIFACT, summary=summary)

@@ -97,10 +97,12 @@ def _scrape_sp500_from_wikipedia() -> List[Dict[str, str]]:
 
     rows: List[Dict[str, str]] = []
     for rec in table.to_dict("records"):
+        sub = rec.get("GICS Sub-Industry")
         rows.append({
             "ticker": _normalize_ticker(str(rec["Symbol"])),
             "company_name": str(rec["Security"]).strip(),
             "gics_sector": str(rec["GICS Sector"]).strip(),
+            "gics_sub_industry": str(sub).strip() if isinstance(sub, str) and sub.strip() else None,
         })
     if len(rows) < 400:
         raise ValueError(f"维基百科成分表只解析出 {len(rows)} 行，明显不完整，判定为抓取失败")
@@ -114,6 +116,7 @@ def _load_sp500_from_fallback_csv() -> List[Dict[str, str]]:
                 "ticker": _normalize_ticker(r["ticker"]),
                 "company_name": r["company_name"].strip(),
                 "gics_sector": r["gics_sector"].strip(),
+                "gics_sub_industry": (r.get("gics_sub_industry") or "").strip() or None,
             }
             for r in csv.DictReader(f)
         ]
@@ -137,11 +140,15 @@ def _read_constituents_cache() -> Optional[List[Dict[str, str]]]:
         return None
 
     data_json, fetched_at = row
+    rows = json.loads(data_json)
+    if rows and "gics_sub_industry" not in rows[0]:
+        logger.info("S&P 500 成分名单缓存缺少 gics_sub_industry 字段(旧格式)，将重新抓取")
+        return None
     age = datetime.now(timezone.utc) - datetime.fromisoformat(fetched_at)
     if age.total_seconds() > CONSTITUENTS_CACHE_TTL_DAYS * 86400:
         logger.info(f"S&P 500 成分名单缓存已过期(距上次抓取 {age}),将重新抓取")
         return None
-    return json.loads(data_json)
+    return rows
 
 
 def _write_constituents_cache(rows: List[Dict[str, str]]) -> None:
@@ -230,6 +237,84 @@ def classify_market_cap(market_cap: float) -> str:
 # ---------------------------------------------------------------------------
 # 3) 全域筛选
 # ---------------------------------------------------------------------------
+SHARIA_STANDARDS = ("aaoifi", "djim")
+
+
+def _verdict(flag) -> str:
+    return {True: "compliant", False: "non_compliant"}.get(flag, "unknown")
+
+
+def _pct(x) -> str:
+    return f"{x:.1%}"
+
+
+def sharia_summary(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Compact per-standard Shari'ah verdicts for one screened ticker, from the
+    `sharia_compliance` part of get_stock_context (market_data schema v4):
+        {"aaoifi": {"verdict", "reasons", ...}, "djim": {"verdict", "reasons", ...}}
+    verdict = compliant | non_compliant | unknown (data missing -> not provable).
+    """
+    sc = (ctx or {}).get("sharia_compliance") or {}
+    if not sc.get("success"):
+        why = [f"no Sharia data: {sc.get('error') or 'fetch failed'}"]
+        return {k: {"verdict": "unknown", "reasons": list(why), "category": None} for k in SHARIA_STANDARDS}
+
+    # AAOIFI SS-21 (top-level fields of the sharia record)
+    a = []
+    if sc.get("sector_exclusion_flag"):
+        a.append(sc.get("exclusion_reason") or "prohibited business activity")
+    if sc.get("passes_debt_screen") is False:
+        a.append(f"debt/market cap {_pct(sc['debt_to_market_cap'])} ≥ {sc['debt_to_market_cap_threshold']:.0%}")
+    if sc.get("passes_cash_screen") is False:
+        a.append(f"cash/market cap {_pct(sc['cash_to_market_cap'])} ≥ {sc['cash_to_market_cap_threshold']:.0%} (approx.)")
+    if sc.get("passes_debt_screen") is None:
+        a.append("debt/market cap not available")
+    if sc.get("passes_cash_screen") is None:
+        a.append("cash/market cap not available")
+    aaoifi = {"verdict": _verdict(sc.get("overall_compliant")), "reasons": a,
+              "category": sc.get("excluded_category"),
+              "debt_ratio": sc.get("debt_to_market_cap"), "cash_ratio": sc.get("cash_to_market_cap")}
+
+    # Dow Jones Islamic Market (nested "djim" record)
+    dj = sc.get("djim") or {}
+    d = []
+    if dj.get("sector_exclusion_flag"):
+        d.append(dj.get("exclusion_reason") or "prohibited business activity")
+    for key, label in (("debt", "debt"), ("cash", "cash"), ("receivables", "receivables")):
+        ratio, ok = dj.get(f"{key}_to_avg_mcap"), dj.get(f"passes_{key}_screen")
+        if ok is False:
+            d.append(f"{label}/24m avg market cap {_pct(ratio)} ≥ {dj.get('ratio_threshold', 0.33):.0%}")
+        elif ok is None and dj:
+            d.append(f"{label}/24m avg market cap not available")
+    if not dj:
+        d.append("no DJIM data (cached before schema v4)")
+    djim = {"verdict": _verdict(dj.get("overall_compliant")), "reasons": d,
+            "category": dj.get("excluded_category"),
+            "debt_ratio": dj.get("debt_to_avg_mcap"), "cash_ratio": dj.get("cash_to_avg_mcap"),
+            "receivables_ratio": dj.get("receivables_to_avg_mcap")}
+    return {"aaoifi": aaoifi, "djim": djim}
+
+
+def sharia_combined(summary: Optional[Dict[str, Any]], standards) -> Dict[str, Any]:
+    """
+    Verdict under the chosen standards (several = INTERSECTION: must be compliant
+    under every one). Returns {"verdict", "reasons"} with reasons prefixed by standard.
+    """
+    labels = {"aaoifi": "AAOIFI", "djim": "DJIM"}
+    summary = summary or {}
+    per = [(s, summary.get(s) or {"verdict": "unknown", "reasons": ["no Sharia data"]}) for s in standards]
+    if any(v["verdict"] == "non_compliant" for _, v in per):
+        verdict = "non_compliant"
+    elif any(v["verdict"] == "unknown" for _, v in per):
+        verdict = "unknown"
+    else:
+        verdict = "compliant"
+    reasons = [f"{labels[s]}: {r}" for s, v in per if v["verdict"] != "compliant" for r in v["reasons"]]
+    return {"verdict": verdict, "reasons": reasons,
+            "by_standard": {s: v["verdict"] for s, v in per}}
+
+
 def _looks_like_rate_limit(message: str) -> bool:
     msg = (message or "").lower()
     return any(hint in msg for hint in _RATE_LIMIT_HINTS)
@@ -359,8 +444,10 @@ def _run_screen(
             "ticker": ticker,
             "company_name": row["company_name"],
             "gics_sector": row["gics_sector"],
+            "gics_sub_industry": row.get("gics_sub_industry"),
             "market_cap": float(market_cap),
             "market_cap_tier": tier,
+            "sharia": sharia_summary(ctx),
         }
         if tier_filter is not None and tier not in tier_filter:
             _report(ticker, "filtered", entry=entry)

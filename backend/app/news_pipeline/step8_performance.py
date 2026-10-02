@@ -40,6 +40,12 @@ MARKET_BENCHMARK = "SPY"
 RISK_FREE_TICKER = "^IRX"
 HORIZONS = {"4w": 28, "6w": 42}   # the simulation prompt's 4–6 week horizon
 
+# Sharia-screened market benchmarks, added when the run used the Sharia filter
+SHARIA_BENCHMARKS = {
+    "SPUS": "S&P 500 Sharia (SPUS)",
+    "HLAL": "FTSE USA Shariah (HLAL)",
+}
+
 SECTOR_ETF = {
     "Communication Services": "XLC", "Consumer Discretionary": "XLY", "Consumer Staples": "XLP",
     "Energy": "XLE", "Financials": "XLF", "Health Care": "XLV", "Industrials": "XLI",
@@ -63,7 +69,8 @@ def build(run_id: str, fetch=fetch_close_history, today: date = None) -> Dict[st
 
     votes = {r["ticker"]: r["votes"] for r in consensus["ranking"] if r["selected"]}
     sector_etfs = [SECTOR_ETF[s] for s in universe["sectors"] if s in SECTOR_ETF]
-    wanted = list(dict.fromkeys(universe["ticker_universe"] + [MARKET_BENCHMARK] + sector_etfs))
+    sharia_etfs = list(SHARIA_BENCHMARKS) if universe.get("sharia") else []
+    wanted = list(dict.fromkeys(universe["ticker_universe"] + [MARKET_BENCHMARK] + sharia_etfs + sector_etfs))
 
     run_store.update_step(run_id, STEP, run_store.STEP_RUNNING)
     try:
@@ -123,6 +130,9 @@ def _compute(universe, report_json, consensus, votes, sector_etfs, history, as_o
                       "weights": {t: 1.0 for t in p["tickers"]}})
     specs.append({"key": MARKET_BENCHMARK, "label": "S&P 500 (SPY)", "kind": "benchmark",
                   "weights": {MARKET_BENCHMARK: 1.0}})
+    if universe.get("sharia"):
+        for etf, label in SHARIA_BENCHMARKS.items():
+            specs.append({"key": etf, "label": label, "kind": "benchmark", "weights": {etf: 1.0}})
     for etf, sector in zip(sector_etfs, [s for s in universe["sectors"] if s in SECTOR_ETF]):
         specs.append({"key": etf, "label": f"{sector} ({etf})", "kind": "benchmark", "weights": {etf: 1.0}})
     specs.append({"key": "universe_ew", "label": "Universe EW", "kind": "benchmark",

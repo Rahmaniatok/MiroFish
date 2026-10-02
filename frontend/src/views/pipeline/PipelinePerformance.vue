@@ -224,7 +224,7 @@ const corrMode = ref('corr')
 // ---- colour: personas take the validated categorical slots in fixed order;
 // consensus is primary ink (weight, not a 9th hue); benchmarks are muted + dashed.
 const CATEGORICAL = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948']
-const BENCH_DASH = ['7 4', '2 3', '10 3 2 3', '4 2']
+const BENCH_DASH = ['7 4', '2 3', '10 3 2 3', '4 2', '1 3', '12 4']
 const styles = computed(() => {
   const out = {}
   let pi = 0
@@ -232,7 +232,7 @@ const styles = computed(() => {
   for (const p of res.value?.portfolios || []) {
     if (p.kind === 'consensus') out[p.key] = { color: '#0b0b0b', width: 3.2 }
     else if (p.kind === 'persona') out[p.key] = { color: CATEGORICAL[pi++ % 8], width: 1.8 }
-    else out[p.key] = { color: bi === 0 ? '#52514e' : '#898781', width: 1.8, dash: BENCH_DASH[bi++ % 4] }
+    else out[p.key] = { color: bi === 0 ? '#52514e' : '#898781', width: 1.8, dash: BENCH_DASH[bi++ % BENCH_DASH.length] }
   }
   return out
 })

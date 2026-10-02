@@ -147,10 +147,15 @@ _FUNDAMENTAL_SCHEMA_VERSION = 2
 
 _SHARIA_STANDARD = "AAOIFI Shari'ah Standard No. 21"
 
-# AAOIFI debt screen threshold: interest-bearing debt / market cap must be < 33%
-# (per AAOIFI Shari'ah Standard No. 21 as cited in the project reference material;
-# note some other screening boards, e.g. AAOIFI-conservative readings, use 30%).
-_SHARIA_DEBT_TO_MCAP_THRESHOLD = 0.33
+# AAOIFI Shari'ah Standard No. 21: interest-bearing debt / market cap must be < 30%.
+# (Was 0.33 until 2026-09-30 — 33% is the DJIM / S&P Shariah / MSCI threshold, not
+# AAOIFI's; corrected on the user's instruction.)
+_SHARIA_DEBT_TO_MCAP_THRESHOLD = 0.30
+# AAOIFI SS-21: (cash + interest-bearing securities) / market cap must be < 30%.
+# APPROXIMATION: yfinance has no interest-bearing split, so `totalCash` (cash +
+# short-term investments) is used as the numerator — it overstates the true
+# interest-bearing amount, so the screen errs on the strict side.
+_SHARIA_CASH_TO_MCAP_THRESHOLD = 0.30
 
 # category key -> human-readable label (used to build exclusion_reason)
 _SHARIA_CATEGORY_LABELS = {
@@ -213,9 +218,6 @@ _SHARIA_UNAVAILABLE_CHECKS = {
     "impure_income_ratio": "Interest income + other non-compliant revenue as a share of total "
                            "income (AAOIFI cap: < 5%). Needs a line-item income statement / "
                            "revenue-source breakdown that yfinance does not provide.",
-    "interest_bearing_investments_ratio": "(Cash + interest-bearing securities) / market cap "
-                                          "(AAOIFI cap: < 30%). yfinance has no split of "
-                                          "interest-bearing vs non-interest-bearing investments.",
     "illiquid_asset_ratio": "Tangible/illiquid assets as a share of total assets (some boards "
                             "require >= 30% for share tradability). Not derivable here.",
     "dividend_purification_amount": "Per-share amount to donate to purify impure income. "
@@ -233,7 +235,10 @@ _SHARIA_UNAVAILABLE_CHECKS = {
 #   1 -> Phase 1g initial shape
 #   2 -> debt screen threshold corrected 0.30 -> 0.33 (changes passes_debt_screen /
 #        overall_compliant / debt_to_market_cap_threshold on cached rows)
-_SHARIA_SCHEMA_VERSION = 2
+#   3 -> AAOIFI thresholds: debt 0.33 -> 0.30, plus the approximated cash screen
+#        (total_cash, cash_to_market_cap, passes_cash_screen) in overall_compliant
+#   4 -> adds the Dow Jones Islamic Market screen under "djim" (top-level fields stay AAOIFI)
+_SHARIA_SCHEMA_VERSION = 4
 
 
 # Dipakai sebagai pengganti "tanpa batas bawah" untuk period="max" (lihat
@@ -730,6 +735,136 @@ def _classify_sharia_sector_exclusion(
     return {"flag": False, "category": None, "reason": None}
 
 
+# ----------------------------------------------------------------------------
+# Dow Jones Islamic Market (DJIM) screen — second Shari'ah standard (2026-09-30).
+# Methodology (S&P DJI "Dow Jones Islamic Market Indices"):
+#   business activity: alcohol, pork-related products, conventional financial
+#     services, entertainment (hotels, casinos/gambling, cinema, pornography,
+#     music), tobacco, weapons & defense are excluded;
+#   financial ratios, each must be < 33%, denominator = TRAILING 24-MONTH
+#     AVERAGE market capitalisation:
+#       total debt / avg mcap
+#       (cash + interest-bearing securities) / avg mcap
+#       accounts receivable / avg mcap
+# Data (yfinance): numerators from the latest QUARTERLY balance sheet dated on or
+# before as_of (filing lag ignored); avg mcap = current sharesOutstanding x mean
+# of the 24 monthly closes ending at as_of (share count is today's). Cash uses
+# "Cash, Cash Equivalents And Short Term Investments" (approximation, as for
+# AAOIFI). Pork has no industry of its own in Yahoo's taxonomy, so the S&P 500
+# pork processors are listed explicitly.
+# ----------------------------------------------------------------------------
+DJIM_STANDARD = "Dow Jones Islamic Market Indices methodology"
+_DJIM_RATIO_THRESHOLD = 0.33
+_DJIM_CATEGORY_LABELS = {
+    **_SHARIA_CATEGORY_LABELS,
+    "entertainment": "entertainment — cinema / music / media & streaming",
+    "hotels": "hotels / lodging",
+    "pork": "pork-related products",
+}
+_DJIM_PROHIBITED_INDUSTRIES = {
+    **_SHARIA_PROHIBITED_INDUSTRIES,
+    "entertainment": "entertainment",
+    "lodging": "hotels",
+}
+_DJIM_PORK_TICKERS = {"HRL": "Hormel Foods", "TSN": "Tyson Foods"}
+_DJIM_UNAVAILABLE = {
+    "newspaper_exception": "DJIM exempts newspapers from the media exclusion; Yahoo files publishers "
+                           "such as News Corp under 'Entertainment', so they are excluded.",
+    "impure_income": "Income purification for non-permissible revenue is not computed.",
+}
+_BS_DEBT = ("Total Debt",)
+_BS_CASH = ("Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents")
+_BS_RECEIVABLES = ("Accounts Receivable", "Receivables")
+
+
+def _balance_sheet_value(bs, names, as_of: Optional[date]):
+    """First available row in `names`, from the latest column dated <= as_of."""
+    if bs is None or getattr(bs, "empty", True):
+        return None, None
+    cols = [c for c in bs.columns if as_of is None or c.date() <= as_of]
+    if not cols:
+        return None, None
+    col = max(cols)
+    for name in names:
+        if name in bs.index:
+            v = bs.loc[name, col]
+            if v == v and v is not None:
+                return float(v), col.strftime("%Y-%m-%d")
+    return None, col.strftime("%Y-%m-%d")
+
+
+def _djim_screen(tk, info: Dict[str, Any], ticker: str, sector: Optional[str], industry: Optional[str],
+                 as_of_date: Optional[str]) -> Dict[str, Any]:
+    as_of = date.fromisoformat(as_of_date) if as_of_date else date.today()
+    industry_norm = (industry or "").strip().lower()
+    category = _DJIM_PROHIBITED_INDUSTRIES.get(industry_norm)
+    if category is None and ticker in _DJIM_PORK_TICKERS:
+        category = "pork"
+    if category is None:
+        category = _SHARIA_PROHIBITED_SECTORS.get((sector or "").strip().lower())
+    exclusion_reason = (f"{_DJIM_CATEGORY_LABELS[category]} (yfinance industry: {industry!r})"
+                        if category else None)
+
+    unavailable = dict(_DJIM_UNAVAILABLE)
+    try:
+        bs = tk.quarterly_balance_sheet
+    except Exception as e:  # noqa: BLE001
+        bs, unavailable["balance_sheet"] = None, f"quarterly balance sheet not available: {e}"
+    debt, bs_date = _balance_sheet_value(bs, _BS_DEBT, as_of)
+    cash, _ = _balance_sheet_value(bs, _BS_CASH, as_of)
+    receivables, _ = _balance_sheet_value(bs, _BS_RECEIVABLES, as_of)
+    if debt is None and info.get("totalDebt") is not None:   # fall back to the snapshot
+        debt = float(info["totalDebt"])
+        unavailable["debt_source"] = "no balance-sheet Total Debt <= as_of; used current .info totalDebt"
+
+    avg_mcap = None
+    shares = info.get("sharesOutstanding")
+    try:
+        hist = tk.history(start=(as_of - timedelta(days=731)).isoformat(),
+                          end=(as_of + timedelta(days=1)).isoformat(), interval="1mo", auto_adjust=False)
+        closes = hist["Close"].dropna() if hist is not None and not hist.empty else []
+        if shares and len(closes) >= 12:
+            avg_mcap = float(shares) * float(closes.mean())
+        elif len(closes) < 12:
+            unavailable["avg_market_cap_24m"] = f"only {len(closes)} monthly closes before as_of"
+    except Exception as e:  # noqa: BLE001
+        unavailable["avg_market_cap_24m"] = f"price history not available: {e}"
+    if avg_mcap is None and "avg_market_cap_24m" not in unavailable:
+        unavailable["avg_market_cap_24m"] = "sharesOutstanding not available"
+
+    def ratio(x):
+        return round(x / avg_mcap, 6) if (x is not None and avg_mcap) else None
+    ratios = {"debt": ratio(debt), "cash": ratio(cash), "receivables": ratio(receivables)}
+    passes = {k: (None if v is None else v < _DJIM_RATIO_THRESHOLD) for k, v in ratios.items()}
+    for k, v in ratios.items():
+        if v is None:
+            unavailable.setdefault(f"{k}_ratio", f"{k} / 24-month average market cap could not be computed")
+
+    if category or False in passes.values():
+        overall: Optional[bool] = False
+    elif None in passes.values():
+        overall = None
+    else:
+        overall = True
+    return {
+        "standard": DJIM_STANDARD,
+        "ratio_threshold": _DJIM_RATIO_THRESHOLD,
+        "balance_sheet_date": bs_date,
+        "avg_market_cap_24m": round(avg_mcap, 2) if avg_mcap else None,
+        "debt_to_avg_mcap": ratios["debt"],
+        "cash_to_avg_mcap": ratios["cash"],
+        "receivables_to_avg_mcap": ratios["receivables"],
+        "passes_debt_screen": passes["debt"],
+        "passes_cash_screen": passes["cash"],
+        "passes_receivables_screen": passes["receivables"],
+        "sector_exclusion_flag": bool(category),
+        "excluded_category": category,
+        "exclusion_reason": exclusion_reason,
+        "overall_compliant": overall,
+        "unavailable_checks": unavailable,
+    }
+
+
 def _sharia_error(ticker: str, error: str, as_of_date: Optional[str] = None) -> Dict[str, Any]:
     return {
         "ticker": ticker,
@@ -783,7 +918,10 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
             "market_cap": int | None,
             "debt_to_market_cap": float | None,   # total_debt / market_cap; DISTINCT
                                                   #   from fundamental.debt_to_equity
-            "debt_to_market_cap_threshold": 0.33, # AAOIFI cap (SS-21, per project ref)
+            "debt_to_market_cap_threshold": 0.30, # AAOIFI SS-21 cap
+            "cash_to_market_cap": float | None,   # totalCash / market_cap (approximation)
+            "cash_to_market_cap_threshold": 0.30, # AAOIFI SS-21 cap
+            "passes_cash_screen": bool | None,
             "passes_debt_screen": bool | None,    # ratio < threshold; None if ratio None
 
             "sector": str | None, "industry": str | None,
@@ -791,7 +929,7 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
             "excluded_category": str | None, # machine key: conventional_finance / alcohol / ...
             "exclusion_reason": str | None,  # human explanation, or None if not excluded
 
-            "overall_compliant": bool | None,# NOT excluded AND passes_debt_screen;
+            "overall_compliant": bool | None,# NOT excluded AND debt AND cash screens pass;
                                              #   None if the debt screen is indeterminate.
                                              #   PARTIAL — see unavailable_checks.
             "unavailable_checks": {check: reason_it_cannot_be_computed},
@@ -803,7 +941,8 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
         return _sharia_error(ticker, "股票代码不能为空", as_of_date)
 
     try:
-        info = yf.Ticker(ticker).info
+        tk = yf.Ticker(ticker)
+        info = tk.info
     except YFException as e:
         logger.warning(f"获取 {ticker} Sharia 数据失败(yfinance异常): {e}")
         return _sharia_error(ticker, f"yfinance请求失败: {e}", as_of_date)
@@ -820,6 +959,7 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
     sector = info.get("sector")
     industry = info.get("industry")
     total_debt = info.get("totalDebt")
+    total_cash = info.get("totalCash")
     market_cap = info.get("marketCap")
 
     # --- financial-ratio screen: debt / market cap ---
@@ -836,15 +976,29 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
     )
 
     # --- business-activity screen: sector/industry exclusion ---
+    # --- cash screen (APPROXIMATED with totalCash, see _SHARIA_CASH_TO_MCAP_THRESHOLD) ---
+    cash_to_market_cap: Optional[float] = None
+    if (
+        total_cash is not None and total_cash == total_cash
+        and market_cap is not None and market_cap == market_cap
+        and market_cap > 0
+    ):
+        cash_to_market_cap = round(float(total_cash) / float(market_cap), 6)
+    passes_cash_screen: Optional[bool] = (
+        None if cash_to_market_cap is None
+        else cash_to_market_cap < _SHARIA_CASH_TO_MCAP_THRESHOLD
+    )
+
     exclusion = _classify_sharia_sector_exclusion(sector, industry)
 
     # --- overall (PARTIAL — only the checks we can actually run) ---
-    if exclusion["flag"]:
+    # any failed screen -> non-compliant; otherwise a missing ratio -> unknown (None)
+    if exclusion["flag"] or passes_debt_screen is False or passes_cash_screen is False:
         overall_compliant: Optional[bool] = False
-    elif passes_debt_screen is None:
-        overall_compliant = None            # can't confirm without the debt ratio
+    elif passes_debt_screen is None or passes_cash_screen is None:
+        overall_compliant = None
     else:
-        overall_compliant = bool(passes_debt_screen)
+        overall_compliant = True
 
     warning = (
         "Sharia screening signals are derived from the CURRENT yfinance snapshot "
@@ -852,7 +1006,8 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
     )
     if as_of_date is not None:
         warning += f"; as_of_date={as_of_date} is a label only, the data is today's"
-    warning += ". PARTIAL: only the debt and business-activity screens are run — "
+    warning += (". PARTIAL: debt, cash (approximated with totalCash) and business-activity "
+                "screens are run — ")
     warning += "see unavailable_checks for AAOIFI criteria not computed."
 
     unavailable = dict(_SHARIA_UNAVAILABLE_CHECKS)
@@ -860,6 +1015,11 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
         unavailable["debt_to_market_cap"] = (
             f"yfinance returned totalDebt={total_debt!r} / marketCap={market_cap!r}; "
             f"the debt screen could not be computed for this ticker."
+        )
+    if cash_to_market_cap is None:
+        unavailable["cash_to_market_cap"] = (
+            f"yfinance returned totalCash={total_cash!r} / marketCap={market_cap!r}; "
+            f"the cash screen could not be computed for this ticker."
         )
     if not sector and not industry:
         unavailable["business_activity_screen"] = (
@@ -881,6 +1041,11 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
         "debt_to_market_cap": debt_to_market_cap,
         "debt_to_market_cap_threshold": _SHARIA_DEBT_TO_MCAP_THRESHOLD,
         "passes_debt_screen": passes_debt_screen,
+        "total_cash": total_cash if (total_cash == total_cash) else None,
+        "cash_to_market_cap": cash_to_market_cap,
+        "cash_to_market_cap_threshold": _SHARIA_CASH_TO_MCAP_THRESHOLD,
+        "passes_cash_screen": passes_cash_screen,
+        "cash_screen_is_approximation": True,   # totalCash, not interest-bearing only
         "sector": sector,
         "industry": industry,
         "sector_exclusion_flag": exclusion["flag"],
@@ -888,6 +1053,8 @@ def fetch_sharia_compliance_data(ticker: str, as_of_date: Optional[str] = None) 
         "exclusion_reason": exclusion["reason"],
         "overall_compliant": overall_compliant,
         "unavailable_checks": unavailable,
+        # second standard, same snapshot of the company (see _djim_screen)
+        "djim": _djim_screen(tk, info, ticker, sector, industry, as_of_date),
     }
 
 

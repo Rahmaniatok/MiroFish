@@ -46,6 +46,11 @@
               <span class="tag-label">SECTORS</span>
               <span v-for="(n, s) in summary.by_sector" :key="s" class="entity-tag">{{ s }} <b>{{ n }}</b></span>
             </div>
+            <div class="meta-line" v-if="summary.by_industry">
+              <span class="tag-label">INDUSTRIES</span>
+              <span v-if="!run.config.industries" class="entity-tag">all industries</span>
+              <span v-for="(n, ind) in summary.by_industry" :key="ind" class="entity-tag">{{ ind }} <b>{{ n }}</b></span>
+            </div>
             <div class="meta-line">
               <span class="tag-label">TIERS</span>
               <span v-for="(n, t) in summary.by_tier" :key="t" class="entity-tag" :class="`tier-${t}`">{{ t }} <b>{{ n }}</b></span>
@@ -70,6 +75,14 @@
               No market data (skipped): {{ universe.skipped.map(s => s.ticker).join(', ') }}
             </div>
             <div v-for="w in universe.warnings" :key="w" class="note warn">⚠ {{ w }}</div>
+            <div v-if="universe.sharia" class="sharia-note">
+              <span class="sh-badge">☪ Sharia filter · {{ universe.sharia.standard }}</span>
+              <span>{{ universe.sharia.excluded.length }} ticker(s) removed as not (provably) compliant</span>
+            </div>
+            <details v-if="universe.sharia?.excluded?.length" class="caveats">
+              <summary>Removed by the Sharia filter</summary>
+              <p v-for="x in universe.sharia.excluded" :key="x.ticker"><b>{{ x.ticker }}</b> — {{ x.reasons.join(' · ') }}</p>
+            </details>
             <details class="caveats">
               <summary>Data caveats</summary>
               <p v-for="c in universe.caveats" :key="c">{{ c }}</p>
@@ -433,6 +446,8 @@ i.tier-small { background: #BDBDBD; }
 .note.error { color: #C62828; }
 .caveats { margin-top: 10px; font-size: 11px; color: #888; }
 .caveats summary { cursor: pointer; font-weight: 600; }
+.sharia-note { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; font-size: 11.5px; color: #555; }
+.sh-badge { font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 800; color: #1b7a4a; background: #E8F5EE; padding: 3px 8px; border-radius: 4px; }
 .caveats p { margin-top: 4px; line-height: 1.5; }
 
 .next-box {

@@ -73,7 +73,9 @@ def create_run():
     try:
         manifest = step1_universe.lock_universe(
             body.get('task_id', ''), (body.get('name') or '').strip(),
-            body.get('excluded_tickers') or [], body.get('market_cap_tiers') or None)
+            body.get('excluded_tickers') or [], body.get('market_cap_tiers') or None,
+            bool(body.get('sharia_filter')), body.get('sharia_standards') or None,
+            industries=body.get('industries') or None)
     except LookupError as e:
         return _err(str(e), 404)
     except ValueError as e:
