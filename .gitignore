@@ -58,3 +58,5 @@ backend/uploads/
 
 # Docker 数据
 data/
+# yfinance/Finnhub market data cache (regenerated on demand; too big for GitHub)
+backend/app/data_layer/market_cache.db

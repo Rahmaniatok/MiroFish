@@ -28,9 +28,19 @@ export function getUniverseScreen(taskId) {
   return service({ url: `/api/pipeline/universe/screen/${taskId}`, method: 'get' })
 }
 
+/** Start fetching statements + industry benchmarks for a finished screen → {task_id} */
+export function startFundamentals(screenTaskId) {
+  return service({ url: '/api/pipeline/universe/fundamentals', method: 'post', data: { screen_task_id: screenTaskId } })
+}
+
+/** Poll the fundamentals task; result = ratios, benchmarks and ranks per basis/level */
+export function getFundamentals(taskId) {
+  return service({ url: `/api/pipeline/universe/fundamentals/${taskId}`, method: 'get' })
+}
+
 /**
  * Lock a finished screen as ticker_universe → new run (step 1 completed)
- * @param {Object} data - {task_id, name, market_cap_tiers, excluded_tickers}
+ * @param {Object} data - {task_id, name, market_cap_tiers, excluded_tickers, fundamentals?}
  */
 export function createRun(data) {
   return service({ url: '/api/pipeline/runs', method: 'post', data })

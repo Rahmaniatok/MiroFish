@@ -7,7 +7,7 @@ app/news_pipeline/run_store.py. Responses follow the project convention
 from flask import Response, jsonify, request
 
 from . import pipeline_bp
-from ..news_pipeline import (run_store, step1_universe, step2_news, step3_seed, step4_prompt,
+from ..news_pipeline import (fundamentals, run_store, step1_universe, step2_news, step3_seed, step4_prompt,
                              step5_mirofish, step6_report_json, step7_consensus, step8_performance)
 from ..utils.logger import get_logger
 
@@ -66,6 +66,27 @@ def universe_screen_status(task_id):
     return _ok(task)
 
 
+@pipeline_bp.route('/universe/fundamentals', methods=['POST'])
+def universe_fundamentals():
+    """Fetch statements + benchmark every company of a finished screen (background task)."""
+    body = request.get_json(silent=True) or {}
+    try:
+        task_id = fundamentals.start_fundamentals(body.get('screen_task_id', ''))
+    except LookupError as e:
+        return _err(str(e), 404)
+    except ValueError as e:
+        return _err(str(e))
+    return _ok({"task_id": task_id}, 202)
+
+
+@pipeline_bp.route('/universe/fundamentals/<task_id>', methods=['GET'])
+def universe_fundamentals_status(task_id):
+    task = fundamentals.get_fundamentals(task_id)
+    if task is None:
+        return _err("Fundamentals task not found (backend restarted?) — please load them again", 404)
+    return _ok(task)
+
+
 @pipeline_bp.route('/runs', methods=['POST'])
 def create_run():
     """Lock a finished screen as ticker_universe -> new run with step 1 completed."""
@@ -75,7 +96,8 @@ def create_run():
             body.get('task_id', ''), (body.get('name') or '').strip(),
             body.get('excluded_tickers') or [], body.get('market_cap_tiers') or None,
             bool(body.get('sharia_filter')), body.get('sharia_standards') or None,
-            industries=body.get('industries') or None)
+            industries=body.get('industries') or None,
+            fundamentals_filter=body.get('fundamentals') or None)
     except LookupError as e:
         return _err(str(e), 404)
     except ValueError as e:

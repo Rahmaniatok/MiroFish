@@ -22,7 +22,7 @@ from ..data_layer.universe import (
 )
 from ..models.task import TaskManager, TaskStatus
 from ..utils.logger import get_logger
-from . import run_store
+from . import fundamentals, run_store
 
 logger = get_logger('mirofish.news_pipeline.step1')
 
@@ -112,6 +112,7 @@ def get_options() -> Dict[str, Any]:
         "caveats": CAVEATS,
         "sharia": {"standards": SHARIA_STANDARD_INFO, "missing_rule": SHARIA_MISSING_RULE,
                    "combine": "several standards = intersection (must pass every selected one)"},
+        "fundamentals": fundamentals.get_catalog(),
     }
 
 
@@ -233,6 +234,7 @@ def lock_universe(
     sharia_filter: bool = False,
     sharia_standards: Optional[List[str]] = None,
     industries: Optional[List[str]] = None,
+    fundamentals_filter: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Create a pipeline run from a finished screen. The universe rows come from
@@ -248,6 +250,11 @@ def lock_universe(
 
     sharia_standards: Shari'ah standards to apply ("aaoifi", "djim"); several =
     INTERSECTION. (sharia_filter=True alone is the older AAOIFI-only form.)
+
+    fundamentals_filter: optional {task_id, lens, basis, level, threshold,
+    disabled} from the Fundamental Lab. It never removes tickers by itself (the
+    user's picks arrive as excluded_tickers); it records the lens, the industry
+    benchmarks and each kept ticker's ratios/ranks in 01_universe.json.
     Keep only tickers "compliant" under every chosen standard
     (computed during the screen, see universe.sharia_summary); non-compliant
     AND unknown ones are recorded in `sharia_excluded` with their reasons.
@@ -299,6 +306,11 @@ def lock_universe(
     if not universe:
         raise ValueError("ticker_universe is empty — keep at least one ticker")
 
+    fund_record = None
+    if fundamentals_filter and fundamentals_filter.get("task_id"):
+        fund_record = fundamentals.lock_record(fundamentals_filter["task_id"], task_id,
+                                               [r["ticker"] for r in universe], fundamentals_filter)
+
     warnings = validate_as_of(screen["as_of_date"])["warnings"]
     config = {
         "as_of_date": screen["as_of_date"],
@@ -307,6 +319,8 @@ def lock_universe(
         "industries": chosen_industries,          # None = all industries
         "sharia_filter": bool(standards),
         "sharia_standards": standards,
+        "fundamentals": ({k: fund_record[k] for k in ("lens", "basis", "level", "threshold")}
+                         if fund_record else None),
     }
     manifest = run_store.create_run(name, config)
     run_id = manifest["run_id"]
@@ -330,6 +344,7 @@ def lock_universe(
                     "combine": "intersection" if len(standards) > 1 else "single",
                     "excluded": sharia_excluded}
                    if standards else None),
+        "fundamentals": fund_record,
     }
     run_store.write_artifact(run_id, ARTIFACT, artifact)
 
@@ -353,13 +368,19 @@ def lock_universe(
         "sharia_filter": bool(standards),
         "sharia_standards": standards,
         "sharia_excluded_count": len(sharia_excluded),
+        "fundamentals": ({"lens": fund_record["lens"], "basis": fund_record["basis"],
+                          "level": fund_record["level"], "threshold": fund_record["threshold"],
+                          "passing_count": len(fund_record["passing"])} if fund_record else None),
     }
     run_store.append_log(run_id, "universe_locked",
                          f"ticker_universe locked: {len(universe)} tickers @ {config['as_of_date']}"
                          + (f" · {len(chosen_industries)} industr{'y' if len(chosen_industries) == 1 else 'ies'}"
                             if chosen_industries else " · all industries")
                          + (f" · Sharia filter ({' ∩ '.join(SHARIA_STANDARD_INFO[s]['label'] for s in standards)})"
-                            f" removed {len(sharia_excluded)}" if standards else ""),
+                            f" removed {len(sharia_excluded)}" if standards else "")
+                         + (f" · {fund_record['lens']} lens ({fund_record['basis'].upper()}, "
+                            f"{len(fund_record['passing'])}/{len(universe)} beat the industry median)"
+                            if fund_record else ""),
                          {"tickers": artifact["ticker_universe"], "warnings": warnings})
     return run_store.update_step(run_id, "universe", run_store.STEP_COMPLETED,
                                  artifact=ARTIFACT, summary=summary)

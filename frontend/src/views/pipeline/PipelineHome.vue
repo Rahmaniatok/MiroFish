@@ -249,6 +249,9 @@
             </button>
           </div>
           <input class="search" v-model="search" placeholder="Search ticker / company…" />
+          <button class="lab-link" :disabled="!screenReady" @click="scrollToLab">
+            F · Fundamentals <span v-if="fundamentalsCfg">{{ fundamentalsCfg.lens }}</span> ↓
+          </button>
         </div>
 
         <!-- Table -->
@@ -310,7 +313,7 @@
           <div class="lock-info">
             <input class="name-input" v-model="runName" :placeholder="defaultRunName" maxlength="80" />
             <span class="lock-sub" v-if="screenReady">
-              {{ universeRows.length }} tickers · as_of {{ screen.asOf }} · {{ excluded.size }} excluded by you
+              {{ universeRows.length }} tickers · as_of {{ screen.asOf }} · {{ excluded.size }} excluded by you<template v-if="fundamentalsCfg"> · {{ fundamentalsCfg.lens }} lens recorded</template>
             </span>
             <span class="lock-sub" v-else>Screen the universe first to lock it.</span>
           </div>
@@ -322,6 +325,20 @@
         <div v-if="lockError" class="msg error">{{ lockError }}</div>
       </section>
     </main>
+
+    <!-- ============ Fundamental filter (value / growth ratios vs industry) ============ -->
+    <div ref="labRef">
+      <FundamentalLab
+        :catalog="options.fundamentals || undefined"
+        :screen-task-id="screen.status === 'done' ? screen.taskId : null"
+        :screen-ready="screenReady"
+        :peer-count="screenedCount"
+        :candidates="labCandidates"
+        @toggle="toggleExclude"
+        @set-excluded="(list) => (excluded = new Set(list))"
+        @config="(cfg) => (fundamentalsCfg = cfg)"
+      />
+    </div>
 
     <!-- ============ Run history ============ -->
     <section class="history" id="history" ref="historyRef">
@@ -357,6 +374,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PipelineStepRail from '../../components/pipeline/PipelineStepRail.vue'
+import FundamentalLab from '../../components/pipeline/FundamentalLab.vue'
 import { uiCurrentStep } from '../../components/pipeline/pipelineSteps'
 import { formatMarketCap } from '../../utils/universeGraph'
 import {
@@ -407,6 +425,9 @@ const screen = reactive({
   data: {} // ticker -> {tier, market_cap, outcome: 'screened' | 'skipped', reason}
 })
 const excluded = ref(new Set())
+// Fundamental Lab settings ({task_id, lens, basis, level, threshold, disabled}) recorded at lock
+const fundamentalsCfg = ref(null)
+const labRef = ref(null)
 const tab = ref('universe')
 const search = ref('')
 const locking = ref(false)
@@ -536,6 +557,9 @@ const rows = computed(() => {
 })
 
 const universeRows = computed(() => rows.value.filter(r => r.state === 'in'))
+// Fundamental Lab: the rows you can keep, and how many companies feed the industry benchmark
+const labCandidates = computed(() => rows.value.filter(r => r.state === 'in' || r.state === 'excluded'))
+const screenedCount = computed(() => Object.values(screen.data).filter(d => d.outcome === 'screened').length)
 // AAOIFI verdicts among in-tier screened tickers (what the toggle keeps / drops)
 const shariaCounts = computed(() => {
   const c = { compliant: 0, non_compliant: 0, unknown: 0 }
@@ -719,7 +743,8 @@ const lockUniverse = async () => {
       market_cap_tiers: selectedTiers.value,
       sharia_standards: shariaStds.value,
       industries: industryAll.value ? null : availableIndustries.value.filter(i => chosenIndustries.value.has(i.name)).map(i => i.name),
-      excluded_tickers: [...excluded.value]
+      excluded_tickers: [...excluded.value],
+      fundamentals: fundamentalsCfg.value
     })
     router.push(`/pipeline/${res.data.run_id}/news`)
   } catch (e) {
@@ -756,6 +781,7 @@ watch([sectorsKey, asOf, asOfError], () => {
 const openRun = (run) => router.push(run.steps?.seed?.status !== 'completed' ? `/pipeline/${run.run_id}/news` : `/pipeline/${run.run_id}`)
 
 const scrollToHistory = () => historyRef.value?.scrollIntoView({ behavior: 'smooth' })
+const scrollToLab = () => labRef.value?.scrollIntoView({ behavior: 'smooth' })
 
 onMounted(async () => {
   try {
@@ -1273,6 +1299,7 @@ code {
 .tab.on { background: #FFF; color: #000; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .tab-count { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: #FF5722; margin-left: 3px; }
 .search {
+  margin-left: auto;
   border: 1px solid #E5E5E5;
   border-radius: 5px;
   padding: 7px 10px;
@@ -1282,6 +1309,12 @@ code {
   font-family: inherit;
 }
 .search:focus { border-color: #000; }
+.lab-link {
+  border: 1px solid #000; background: #000; color: #FFF; border-radius: 5px; padding: 7px 11px; cursor: pointer;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; white-space: nowrap;
+}
+.lab-link span { color: #FF5722; text-transform: uppercase; }
+.lab-link:disabled { background: #FFF; color: #BBB; border-color: #E5E5E5; cursor: not-allowed; }
 
 .table-wrap {
   flex: 1;
