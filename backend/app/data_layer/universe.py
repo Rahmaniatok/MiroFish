@@ -248,6 +248,19 @@ def _pct(x) -> str:
     return f"{x:.1%}"
 
 
+def price_summary(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Close on/before as_of and the 52-week range ending there (from get_stock_context's price part)."""
+    price = ctx.get("price") or {}
+    stats = price.get("stats") or {}
+    return {
+        "close": price.get("latest_close"),
+        "date": price.get("latest_date"),
+        "high_52w": stats.get("52w_high"),
+        "low_52w": stats.get("52w_low"),
+        "change_1y_pct": stats.get("change_1y_pct"),
+    }
+
+
 def sharia_summary(ctx: Dict[str, Any]) -> Dict[str, Any]:
     """
     Compact per-standard Shari'ah verdicts for one screened ticker, from the
@@ -448,6 +461,7 @@ def _run_screen(
             "market_cap": float(market_cap),
             "market_cap_tier": tier,
             "sharia": sharia_summary(ctx),
+            "price": price_summary(ctx),
         }
         if tier_filter is not None and tier not in tier_filter:
             _report(ticker, "filtered", entry=entry)

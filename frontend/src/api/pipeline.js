@@ -28,6 +28,21 @@ export function getUniverseScreen(taskId) {
   return service({ url: `/api/pipeline/universe/screen/${taskId}`, method: 'get' })
 }
 
+/** Today's close per ticker (display only, for the final-list table) → {TICKER: {close, date}} */
+export function getQuotes(tickers) {
+  return service({ url: '/api/pipeline/universe/quotes', method: 'post', data: { tickers } })
+}
+
+/** Company map (correlation network + clusters) of the current final list, before locking */
+export function previewCompanyMap(taskId, tickers) {
+  return service({ url: '/api/pipeline/universe/map', method: 'post', data: { task_id: taskId, tickers } })
+}
+
+/** A locked run's company map (built on first request for older runs) */
+export function getRunCompanyMap(runId) {
+  return service({ url: `/api/pipeline/runs/${runId}/company-map`, method: 'get' })
+}
+
 /** Start fetching statements + industry benchmarks for a finished screen → {task_id} */
 export function startFundamentals(screenTaskId) {
   return service({ url: '/api/pipeline/universe/fundamentals', method: 'post', data: { screen_task_id: screenTaskId } })

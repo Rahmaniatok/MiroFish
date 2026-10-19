@@ -250,7 +250,7 @@
           </div>
           <input class="search" v-model="search" placeholder="Search ticker / company…" />
           <button class="lab-link" :disabled="!screenReady" @click="scrollToLab">
-            F · Fundamentals <span v-if="fundamentalsCfg">{{ fundamentalsCfg.lens }}</span> ↓
+            F · Fundamentals <span v-if="fundamentalsCfg">{{ fundamentalsCfg.category }}</span> ↓
           </button>
         </div>
 
@@ -313,7 +313,7 @@
           <div class="lock-info">
             <input class="name-input" v-model="runName" :placeholder="defaultRunName" maxlength="80" />
             <span class="lock-sub" v-if="screenReady">
-              {{ universeRows.length }} tickers · as_of {{ screen.asOf }} · {{ excluded.size }} excluded by you<template v-if="fundamentalsCfg"> · {{ fundamentalsCfg.lens }} lens recorded</template>
+              {{ universeRows.length }} tickers · as_of {{ screen.asOf }} · {{ excluded.size }} excluded by you<template v-if="fundamentalsCfg"> · {{ fundamentalsCfg.category }} ratios recorded</template>
             </span>
             <span class="lock-sub" v-else>Screen the universe first to lock it.</span>
           </div>
@@ -337,8 +337,39 @@
         @toggle="toggleExclude"
         @set-excluded="(list) => (excluded = new Set(list))"
         @config="(cfg) => (fundamentalsCfg = cfg)"
+        @evals="(ev) => (fundamentalsEvals = ev)"
       />
     </div>
+
+    <!-- ============ Final list: every company that passed the filters ============ -->
+    <FinalListTable
+      :rows="universeRows"
+      :ready="screenReady"
+      :as-of="screen.asOf"
+      :strategy="fundamentalsCfg"
+      :evals="fundamentalsCfg ? fundamentalsEvals : {}"
+      :catalog="options.fundamentals || null"
+      :can-lock="canLock"
+      :locking="locking"
+      @remove="toggleExclude"
+      @lock="lockUniverse"
+    />
+    <div v-if="lockError" class="final-error">{{ lockError }}</div>
+
+    <!-- ============ Company map of the final list (before any news) ============ -->
+    <section class="map-block" v-if="screenReady">
+      <div class="map-head">
+        <span class="map-num">H</span>
+        <div>
+          <h2>Company map</h2>
+          <p>How the {{ universeRows.length }} companies on the final list move together — bridges from a year of
+            daily-return correlation up to as_of, clusters found from those bridges. Click a company to remove it.</p>
+        </div>
+      </div>
+      <div class="map-frame">
+        <CompanyMap :data="mapData" :loading="mapLoading" :error="mapError" removable @remove="toggleExclude" />
+      </div>
+    </section>
 
     <!-- ============ Run history ============ -->
     <section class="history" id="history" ref="historyRef">
@@ -375,11 +406,13 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PipelineStepRail from '../../components/pipeline/PipelineStepRail.vue'
 import FundamentalLab from '../../components/pipeline/FundamentalLab.vue'
+import FinalListTable from '../../components/pipeline/FinalListTable.vue'
+import CompanyMap from '../../components/pipeline/CompanyMap.vue'
 import { uiCurrentStep } from '../../components/pipeline/pipelineSteps'
 import { formatMarketCap } from '../../utils/universeGraph'
 import {
   getUniverseOptions, validateAsOf, getConstituents,
-  startUniverseScreen, getUniverseScreen, createRun, listRuns
+  startUniverseScreen, getUniverseScreen, createRun, listRuns, previewCompanyMap
 } from '../../api/pipeline'
 
 const router = useRouter()
@@ -425,8 +458,9 @@ const screen = reactive({
   data: {} // ticker -> {tier, market_cap, outcome: 'screened' | 'skipped', reason}
 })
 const excluded = ref(new Set())
-// Fundamental Lab settings ({task_id, lens, basis, level, threshold, disabled}) recorded at lock
+// Fundamental Lab settings ({task_id, category, period, level, threshold, metrics}) recorded at lock
 const fundamentalsCfg = ref(null)
+const fundamentalsEvals = ref({})   // ticker -> {passes, beat_count, n, score} under the Lab's current settings
 const labRef = ref(null)
 const tab = ref('universe')
 const search = ref('')
@@ -552,13 +586,36 @@ const rows = computed(() => {
       else state = excluded.value.has(r.ticker) ? 'excluded' : 'in'
     }
     if (screen.status === 'running' && screen.current === r.ticker && !d) state = 'scanning'
-    return { ...r, state, tier: d?.tier || null, market_cap: d?.market_cap ?? null, reason: d?.reason, sharia: d?.sharia || null }
+    return { ...r, state, tier: d?.tier || null, market_cap: d?.market_cap ?? null, reason: d?.reason, sharia: d?.sharia || null, price: d?.price || null }
   }).sort((a, b) => (b.market_cap ?? -1) - (a.market_cap ?? -1) || a.ticker.localeCompare(b.ticker))
 })
 
 const universeRows = computed(() => rows.value.filter(r => r.state === 'in'))
 // Fundamental Lab: the rows you can keep, and how many companies feed the industry benchmark
 const labCandidates = computed(() => rows.value.filter(r => r.state === 'in' || r.state === 'excluded'))
+// company map of the final list: rebuilt (debounced) whenever the list changes
+const mapData = ref(null)
+const mapLoading = ref(false)
+const mapError = ref('')
+let mapTimer = null
+let mapSeq = 0
+watch(() => [screenReady.value, screen.taskId, universeRows.value.map(r => r.ticker).join(',')], ([ready, taskId, key]) => {
+  clearTimeout(mapTimer)
+  if (!ready || !key) { mapData.value = null; return }
+  mapTimer = setTimeout(async () => {
+    const seq = ++mapSeq
+    mapLoading.value = !mapData.value
+    mapError.value = ''
+    try {
+      const res = await previewCompanyMap(taskId, key.split(','))
+      if (seq === mapSeq) mapData.value = res.data
+    } catch (e) {
+      if (seq === mapSeq) mapError.value = e.message
+    } finally {
+      if (seq === mapSeq) mapLoading.value = false
+    }
+  }, 1200)
+})
 const screenedCount = computed(() => Object.values(screen.data).filter(d => d.outcome === 'screened').length)
 // AAOIFI verdicts among in-tier screened tickers (what the toggle keeps / drops)
 const shariaCounts = computed(() => {
@@ -674,7 +731,7 @@ const absorb = (rowsIn, outcome) => {
   (rowsIn || []).forEach(r => {
     screen.data[r.ticker] = outcome === 'skipped'
       ? { outcome, reason: r.reason }
-      : { outcome, tier: r.market_cap_tier, market_cap: r.market_cap, sharia: r.sharia }
+      : { outcome, tier: r.market_cap_tier, market_cap: r.market_cap, sharia: r.sharia, price: r.price }
   })
 }
 
@@ -1309,6 +1366,19 @@ code {
   font-family: inherit;
 }
 .search:focus { border-color: #000; }
+.map-block { max-width: 1440px; margin: 0 auto 40px; padding: 0 40px; }
+.map-head {
+  display: flex; gap: 14px; align-items: flex-start; background: #FFF; border: 1px solid #EAEAEA; border-bottom: none;
+  border-radius: 10px 10px 0 0; padding: 20px 24px; border-top: 3px solid #000;
+}
+.map-num {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 800; width: 26px; height: 26px; display: grid;
+  place-items: center; background: #000; color: #FFF; border-radius: 4px; flex-shrink: 0; margin-top: 3px;
+}
+.map-head h2 { font-size: 1.7rem; font-weight: 600; letter-spacing: -0.8px; margin: 0 0 4px; }
+.map-head p { margin: 0; font-size: 13px; color: #777; max-width: 860px; }
+.map-frame { height: 720px; border: 1px solid #EAEAEA; border-radius: 0 0 10px 10px; overflow: hidden; }
+.final-error { max-width: 1360px; margin: -28px auto 40px; padding: 10px 14px; background: #FDECEC; color: #B42318; font-size: 12px; border-radius: 6px; }
 .lab-link {
   border: 1px solid #000; background: #000; color: #FFF; border-radius: 5px; padding: 7px 11px; cursor: pointer;
   font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; white-space: nowrap;

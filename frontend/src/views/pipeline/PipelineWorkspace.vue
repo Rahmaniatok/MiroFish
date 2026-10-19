@@ -35,7 +35,9 @@
 
     <main class="content-area">
       <div class="panel-wrapper left" :style="leftPanelStyle">
+        <CompanyMap v-if="showCompanyMap" :data="companyMap" :loading="mapLoading" />
         <GraphPanel
+          v-else
           :graphData="graphData"
           :loading="loading"
           :currentPhase="2"
@@ -55,10 +57,11 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import GraphPanel from '../../components/GraphPanel.vue'
+import CompanyMap from '../../components/pipeline/CompanyMap.vue'
 import PipelineWorkbench from '../../components/pipeline/PipelineWorkbench.vue'
 import { PIPELINE_STEPS, uiCurrentStep } from '../../components/pipeline/pipelineSteps'
 import { universeToGraphData } from '../../utils/universeGraph'
-import { getRun, getRunLog } from '../../api/pipeline'
+import { getRun, getRunLog, getRunCompanyMap } from '../../api/pipeline'
 import { getGraphData } from '../../api/graph'
 
 const props = defineProps({ runId: { type: String, required: true } })
@@ -74,6 +77,24 @@ const error = ref('')
 const uiStep = computed(() => uiCurrentStep(run.value))
 const zepGraph = ref(null)
 const graphData = computed(() => zepGraph.value || universeToGraphData(run.value?.universe))
+// Before the Zep graph exists the left panel shows the company map (correlation network + clusters);
+// the plain sector/tier graph is only the fallback when the map cannot be built.
+const companyMap = ref(null)
+const mapLoading = ref(false)
+const mapFailed = ref(false)
+const showCompanyMap = computed(() => !zepGraph.value && !mapFailed.value)
+const loadCompanyMap = async () => {
+  if (companyMap.value || mapLoading.value) return
+  mapLoading.value = true
+  try {
+    companyMap.value = (await getRunCompanyMap(props.runId)).data
+  } catch (e) {
+    mapFailed.value = true
+  } finally {
+    mapLoading.value = false
+  }
+}
+onMounted(loadCompanyMap)
 const graphId = computed(() => run.value?.steps?.simulation?.summary?.stages?.graph === 'completed'
   ? run.value?.links?.graph_id : null)
 

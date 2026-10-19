@@ -66,6 +66,34 @@ def universe_screen_status(task_id):
     return _ok(task)
 
 
+@pipeline_bp.route('/universe/quotes', methods=['POST'])
+def universe_quotes():
+    """Today's close for the final-list table (display only)."""
+    body = request.get_json(silent=True) or {}
+    try:
+        return _ok(step1_universe.get_quotes(body.get('tickers') or []))
+    except ValueError as e:
+        return _err(str(e))
+    except Exception as e:  # noqa: BLE001
+        logger.exception("quotes failed")
+        return _err(str(e), 500)
+
+
+@pipeline_bp.route('/universe/map', methods=['POST'])
+def universe_map():
+    """Company map (correlation network + clusters) of the current final list."""
+    body = request.get_json(silent=True) or {}
+    try:
+        return _ok(step1_universe.preview_map(body.get('task_id', ''), body.get('tickers') or []))
+    except LookupError as e:
+        return _err(str(e), 404)
+    except ValueError as e:
+        return _err(str(e))
+    except Exception as e:  # noqa: BLE001
+        logger.exception("company map failed")
+        return _err(str(e), 500)
+
+
 @pipeline_bp.route('/universe/fundamentals', methods=['POST'])
 def universe_fundamentals():
     """Fetch statements + benchmark every company of a finished screen (background task)."""
@@ -128,6 +156,18 @@ def get_run(run_id):
     except run_store.RunNotFoundError:
         return _err(f"Run not found: {run_id}", 404)
     return _ok({**manifest, "universe": run_store.read_artifact(run_id, step1_universe.ARTIFACT)})
+
+
+@pipeline_bp.route('/runs/<run_id>/company-map', methods=['GET'])
+def get_run_company_map(run_id):
+    try:
+        run_store.load_run(run_id)
+    except run_store.RunNotFoundError:
+        return _err(f"Run not found: {run_id}", 404)
+    cmap = step1_universe.get_run_map(run_id)
+    if cmap is None:
+        return _err("Company map could not be built (no price history?)", 404)
+    return _ok(cmap)
 
 
 @pipeline_bp.route('/runs/<run_id>/log', methods=['GET'])

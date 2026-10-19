@@ -20,14 +20,16 @@ from ..data_layer.universe import (
     get_sp500_constituents,
     sharia_combined,
 )
+from ..data_layer.price_history import fetch_close_history
 from ..models.task import TaskManager, TaskStatus
 from ..utils.logger import get_logger
-from . import fundamentals, run_store
+from . import company_map, fundamentals, run_store
 
 logger = get_logger('mirofish.news_pipeline.step1')
 
 TASK_TYPE = "pipeline_universe_screen"
 ARTIFACT = "01_universe.json"
+MAP_ARTIFACT = "01_company_map.json"
 
 GICS_SECTORS = [
     "Communication Services", "Consumer Discretionary", "Consumer Staples",
@@ -219,6 +221,56 @@ def start_screen(sectors: List[str], tiers: List[str], as_of_date: str) -> str:
     return task_id
 
 
+MAX_QUOTE_TICKERS = 600
+
+
+def get_quotes(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
+    """
+    Latest quoted close (today's price, NOT as_of) for the final-list table, one batch
+    download. Shown next to the as_of price when as_of lies in the past; never used by
+    the pipeline itself, so it cannot leak into the analysis.
+    """
+    tickers = list(dict.fromkeys(t.strip().upper() for t in tickers if t and t.strip()))
+    if not tickers:
+        return {}
+    if len(tickers) > MAX_QUOTE_TICKERS:
+        raise ValueError(f"At most {MAX_QUOTE_TICKERS} tickers per request")
+    today = date.today()
+    history = fetch_close_history(tickers, today - timedelta(days=10), today, adjusted=False)
+    out = {}
+    for t, closes in history.items():
+        d = max(closes)
+        out[t] = {"close": round(closes[d], 2), "date": d}
+    return out
+
+
+def preview_map(task_id: str, tickers: List[str]) -> Dict[str, Any]:
+    """Company map of the current final list (before locking), from a finished screen."""
+    task = TaskManager().get_task(task_id)
+    if task is None or task.task_type != TASK_TYPE:
+        raise LookupError("Screening result not found (backend restarted?) — please screen again")
+    if task.status != TaskStatus.COMPLETED:
+        raise ValueError("Screening has not finished yet")
+    screen = task.result
+    wanted = {t.upper() for t in tickers or []}
+    entries = [r for r in screen["universe"] + screen["filtered_out"] if r["ticker"] in wanted]
+    return company_map.build_map(entries, screen["as_of_date"])
+
+
+def get_run_map(run_id: str) -> Optional[Dict[str, Any]]:
+    """The run's company map; built (and saved) on first request for runs locked before maps existed."""
+    saved = run_store.read_artifact(run_id, MAP_ARTIFACT)
+    if saved is not None:
+        return saved
+    universe = run_store.read_artifact(run_id, ARTIFACT)
+    if not universe:
+        return None
+    built = company_map.build_map_safe(universe["universe"], universe["as_of_date"])
+    if built:
+        run_store.write_artifact(run_id, MAP_ARTIFACT, built)
+    return built
+
+
 def get_screen(task_id: str) -> Optional[Dict[str, Any]]:
     task = TaskManager().get_task(task_id)
     if task is None or task.task_type != TASK_TYPE:
@@ -251,10 +303,11 @@ def lock_universe(
     sharia_standards: Shari'ah standards to apply ("aaoifi", "djim"); several =
     INTERSECTION. (sharia_filter=True alone is the older AAOIFI-only form.)
 
-    fundamentals_filter: optional {task_id, lens, basis, level, threshold,
-    disabled} from the Fundamental Lab. It never removes tickers by itself (the
-    user's picks arrive as excluded_tickers); it records the lens, the industry
-    benchmarks and each kept ticker's ratios/ranks in 01_universe.json.
+    fundamentals_filter: optional {task_id, category, period, level, threshold,
+    metrics} from the Fundamental Lab. It never removes tickers by itself (the
+    user's picks arrive as excluded_tickers); it records the category, the
+    sector/industry benchmarks and each kept ticker's ratios/ranks in
+    01_universe.json.
     Keep only tickers "compliant" under every chosen standard
     (computed during the screen, see universe.sharia_summary); non-compliant
     AND unknown ones are recorded in `sharia_excluded` with their reasons.
@@ -319,7 +372,7 @@ def lock_universe(
         "industries": chosen_industries,          # None = all industries
         "sharia_filter": bool(standards),
         "sharia_standards": standards,
-        "fundamentals": ({k: fund_record[k] for k in ("lens", "basis", "level", "threshold")}
+        "fundamentals": ({k: fund_record[k] for k in ("category", "period", "level", "threshold", "metrics")}
                          if fund_record else None),
     }
     manifest = run_store.create_run(name, config)
@@ -347,6 +400,9 @@ def lock_universe(
         "fundamentals": fund_record,
     }
     run_store.write_artifact(run_id, ARTIFACT, artifact)
+    cmap = company_map.build_map_safe(universe, config["as_of_date"])
+    if cmap:
+        run_store.write_artifact(run_id, MAP_ARTIFACT, cmap)
 
     by_sector: Dict[str, int] = {}
     by_tier: Dict[str, int] = {}
@@ -368,7 +424,9 @@ def lock_universe(
         "sharia_filter": bool(standards),
         "sharia_standards": standards,
         "sharia_excluded_count": len(sharia_excluded),
-        "fundamentals": ({"lens": fund_record["lens"], "basis": fund_record["basis"],
+        "company_map": ({"clusters": len(cmap["clusters"]), "edges": len(cmap["edges"]),
+                         "no_history": cmap["no_history"]} if cmap else None),
+        "fundamentals": ({"category": fund_record["category"], "period": fund_record["period"],
                           "level": fund_record["level"], "threshold": fund_record["threshold"],
                           "passing_count": len(fund_record["passing"])} if fund_record else None),
     }
@@ -378,8 +436,8 @@ def lock_universe(
                             if chosen_industries else " · all industries")
                          + (f" · Sharia filter ({' ∩ '.join(SHARIA_STANDARD_INFO[s]['label'] for s in standards)})"
                             f" removed {len(sharia_excluded)}" if standards else "")
-                         + (f" · {fund_record['lens']} lens ({fund_record['basis'].upper()}, "
-                            f"{len(fund_record['passing'])}/{len(universe)} beat the industry median)"
+                         + (f" · {fund_record['category']} ratios ({fund_record['period']}, "
+                            f"{len(fund_record['passing'])}/{len(universe)} beat their group median)"
                             if fund_record else ""),
                          {"tickers": artifact["ticker_universe"], "warnings": warnings})
     return run_store.update_step(run_id, "universe", run_store.STEP_COMPLETED,

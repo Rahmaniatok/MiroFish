@@ -27,7 +27,7 @@ from .cache import get_cached, set_cache
 logger = get_logger('mirofish.data_layer.financial_statements')
 
 DATA_TYPE = "statements"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2      # 2: + total liabilities (Graham NCAV)
 
 STATEMENT_ROWS = {
     "income": [
@@ -40,7 +40,7 @@ STATEMENT_ROWS = {
         "Stockholders Equity", "Common Stock Equity", "Tangible Book Value", "Total Assets",
         "Total Debt", "Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents",
         "Current Assets", "Current Liabilities", "Invested Capital", "Ordinary Shares Number",
-        "Share Issued",
+        "Share Issued", "Total Liabilities Net Minority Interest",
     ],
     "cashflow": [
         "Free Cash Flow", "Operating Cash Flow", "Capital Expenditure", "Cash Dividends Paid",

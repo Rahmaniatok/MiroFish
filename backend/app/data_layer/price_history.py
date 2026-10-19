@@ -18,16 +18,19 @@ from ..utils.logger import get_logger
 logger = get_logger('mirofish.data_layer.price_history')
 
 
-def fetch_close_history(tickers: List[str], start: date, end: date) -> Dict[str, Dict[str, float]]:
+def fetch_close_history(tickers: List[str], start: date, end: date,
+                        adjusted: bool = True) -> Dict[str, Dict[str, float]]:
     """
     {ticker: {"YYYY-MM-DD": close}} for trading days in [start, end].
     Tickers yfinance has no data for are simply absent from the result.
+    adjusted=False returns the quoted close (split- but not dividend-adjusted),
+    which is what valuation ratios such as P/E use.
     """
     tickers = list(dict.fromkeys(t.strip().upper() for t in tickers if t))
     if not tickers:
         return {}
     df = yf.download(tickers, start=start.isoformat(), end=(end + timedelta(days=1)).isoformat(),
-                     auto_adjust=True, progress=False, group_by="column", threads=True)
+                     auto_adjust=adjusted, progress=False, group_by="column", threads=True)
     if df is None or df.empty:
         return {}
     closes = df["Close"]

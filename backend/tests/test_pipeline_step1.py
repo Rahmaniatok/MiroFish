@@ -148,3 +148,22 @@ def test_lock_all_industries_by_default_and_rejects_unknown(client):
     r = client.post('/api/pipeline/runs', json={"task_id": task_id, "industries": ["Semiconductors"]})
     assert r.status_code == 400 and "Semiconductors" in r.json["error"]
 
+
+
+def test_price_summary_from_stock_context():
+    from app.data_layer.universe import price_summary
+    ctx = {"price": {"latest_close": 101.5, "latest_date": "2026-09-30",
+                     "stats": {"52w_high": 120.0, "52w_low": 80.0, "change_1y_pct": 0.12}}}
+    assert price_summary(ctx) == {"close": 101.5, "date": "2026-09-30", "high_52w": 120.0,
+                                  "low_52w": 80.0, "change_1y_pct": 0.12}
+    assert price_summary({})["close"] is None
+
+
+def test_quotes_endpoint_returns_latest_close(client, monkeypatch):
+    monkeypatch.setattr(step1_universe, "fetch_close_history",
+                        lambda tickers, start, end, adjusted=True:
+                        {"XOM": {"2026-10-08": 110.0, "2026-10-09": 112.5}})
+    r = client.post('/api/pipeline/universe/quotes', json={"tickers": ["xom", "NOPE"]})
+    assert r.status_code == 200
+    assert r.json["data"] == {"XOM": {"close": 112.5, "date": "2026-10-09"}}
+    assert client.post('/api/pipeline/universe/quotes', json={"tickers": []}).json["data"] == {}
